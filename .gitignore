@@ -1,0 +1,9 @@
+node_modules/
+dist/
+release/
+*.tsbuildinfo
+*.local
+# Local survey excerpts are optional and must be reviewed before publication.
+public/sample-cloud.pcd
+public/sample-panorama.jpg
+public/sample-metadata.json

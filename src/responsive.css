@@ -1,0 +1,211 @@
+:root {
+  font-family: "Segoe UI", "Microsoft YaHei", "PingFang SC", Arial, sans-serif;
+}
+
+body {
+  min-width: 0;
+}
+
+.point-canvas-host {
+  position: absolute;
+  inset: 0;
+}
+
+.point-canvas-host canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.point-view.crosshair .point-canvas-host canvas {
+  cursor: crosshair;
+}
+
+.point-view-controls {
+  position: absolute;
+  z-index: 11;
+  top: 9px;
+  right: 8px;
+  display: grid;
+  grid-template-columns: repeat(2, 42px);
+  gap: 3px;
+  padding: 4px;
+  border: 1px solid #ffffff2b;
+  border-radius: 7px;
+  background: #152235d6;
+  backdrop-filter: blur(7px);
+}
+
+.point-view-controls select,
+.point-view-controls button {
+  min-width: 0;
+  height: 23px;
+  border: 0;
+  border-radius: 4px;
+  background: #ffffff16;
+  color: #e9f0f7;
+  font-size: 10px;
+  text-align: center;
+}
+
+.point-view-controls select {
+  padding-left: 2px;
+}
+
+.point-view-controls select option {
+  color: #243149;
+}
+
+.point-view-controls button.active {
+  background: #685ed4;
+}
+
+.point-view-controls button:disabled {
+  opacity: 0.42;
+}
+
+.cloud-selection-rect {
+  position: absolute;
+  z-index: 12;
+  border: 1px solid #b6aaff;
+  background: #8177e23c;
+  pointer-events: none;
+}
+
+.cloud-point-count {
+  position: absolute;
+  z-index: 10;
+  top: 67px;
+  right: 8px;
+  padding: 4px 6px;
+  border-radius: 4px;
+  background: #152235d6;
+  color: #c6f0e6;
+  font-size: 10px;
+  pointer-events: none;
+}
+
+.cloud-edit-controls,
+.cloud-paint-controls {
+  position: absolute;
+  z-index: 11;
+  bottom: 37px;
+  left: 8px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  max-width: calc(100% - 16px);
+  padding: 5px;
+  border: 1px solid #ffffff2b;
+  border-radius: 7px;
+  background: #152235e8;
+  color: #dce8f4;
+  font-size: 10px;
+  box-shadow: 0 4px 15px #0003;
+}
+
+.cloud-edit-controls > span,
+.cloud-paint-controls > span {
+  padding: 0 5px;
+}
+
+.cloud-edit-controls button,
+.cloud-paint-controls button {
+  border: 0;
+  border-radius: 4px;
+  background: #ffffff20;
+  color: #edf3ff;
+  padding: 5px 8px;
+  font-size: 10px;
+}
+
+.cloud-edit-controls button.active {
+  background: #7367dd;
+}
+
+.cloud-paint-controls button:disabled {
+  opacity: .4;
+}
+
+.cloud-brush-cursor {
+  position: absolute;
+  z-index: 9;
+  width: 28px;
+  height: 28px;
+  margin: -14px 0 0 -14px;
+  border: 1px solid #e6ddff;
+  border-radius: 50%;
+  background: #9687ff24;
+  box-shadow: 0 0 0 1px #202336b0;
+  pointer-events: none;
+}
+
+.dimension-block > .field-label {
+  margin-top: 14px;
+  margin-bottom: 10px;
+}
+
+.box-edit-hint {
+  color: #8e9bae;
+  font-size: 10px;
+  line-height: 1.6;
+}
+
+@media (max-width: 950px) {
+  .task-header {
+    padding: 16px 17px;
+  }
+
+  .task-header h1 {
+    font-size: 18px;
+  }
+
+  .task-meta {
+    flex-wrap: wrap;
+    row-gap: 4px;
+  }
+
+  .inspector {
+    width: 230px;
+  }
+
+  .workspace-tools {
+    padding: 0 6px;
+  }
+
+  .projection-button,
+  .ai-button {
+    padding: 7px 5px;
+  }
+
+  .viewport-head {
+    padding: 0 9px;
+  }
+}
+
+@media (max-width: 740px) {
+  .work-area {
+    flex-direction: column;
+  }
+
+  .workspace {
+    min-height: 790px;
+  }
+
+  .inspector,
+  .inspector.is-collapsed {
+    width: auto;
+    min-height: 260px;
+  }
+
+  .task-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .source-layout,
+  .model-layout {
+    grid-template-columns: 1fr;
+  }
+}
