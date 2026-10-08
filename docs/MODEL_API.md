@@ -1,5 +1,9 @@
 # 预标注服务接口（草案 v0.2）
 
+## 当前道路设施图片批次
+
+当前复核页读取 `data_for_annotation/labels/*.txt` 中已经生成的 YOLO 预标注，没有调用在线模型。YOLO 每行是 `classId centerX centerY width height`，后四项归一化到 `[0,1]`，类别编号严格按 `class.txt`：`sign, sign_s, fence, sign_p, fence_v, sign_d, pole`。前端用 `src/reviewData.ts` 解析与导出。若今后为图片接入模型，请以同一编号和坐标契约输出候选框，并在审核前保留来源；不要直接覆盖人工修改。道路设施批次没有点云和相机外参，不使用下述点云/全景联合预测接口。详见 [批次规则](ROAD_FURNITURE_REVIEW.md)。
+
 ## 当前状态
 
 前端已有 `src/types.ts` 的请求/响应类型，以及 `src/prelabel.ts` 的 HTTP 适配器和文件上传函数。**工作台尚未调用这些函数；仓库不包含模型、推理服务、用户认证或资产服务器。**“预标注接口”页面只保存服务根地址，不会发送请求。此文档供后端和模型同事并行实现，接线前先共同确认版本。

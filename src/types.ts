@@ -1,7 +1,7 @@
 export type Vec3 = [number, number, number];
 export type UV = [number, number];
 export type ToolMode = 'navigate' | 'cuboid' | 'cloud-paint' | 'pano-point' | 'pano-polygon';
-export type Page = 'workspace' | 'tasks' | 'sources' | 'ontology' | 'registration' | 'models';
+export type Page = 'review' | 'workspace' | 'tasks' | 'sources' | 'ontology' | 'registration' | 'models';
 
 export interface ClassDefinition {
   id: string;

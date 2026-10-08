@@ -2,6 +2,8 @@
 
 本仓库保持一份 React/Three.js 源码，始终从同一次构建产出 Windows 和 macOS 两个交付包。请在自己的分支修改代码，通过 Pull Request 合并，避免维护功能不同步的两个代码副本。
 
+当前 900 张道路设施图片的复核入口与七类 YOLO 规则见 [道路设施复核说明](docs/ROAD_FURNITURE_REVIEW.md)。不要把 `label/data` 的真实 JPG、TXT、JSON 或 PPTX 复制进仓库或交付 ZIP；复核结果用工作台导出的 YOLO ZIP 交接。
+
 ## 开发与交付
 
 1. 安装 Node.js 20+ 和 Python 3。

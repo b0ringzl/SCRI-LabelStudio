@@ -2,6 +2,12 @@
 
 一个参考 Label Studio 工作流的前端原型，用于室内外建筑组件、标志和地物的多源标注。当前阶段实现界面、配对数据导入、配准核验、人工标注和预标注服务接口定义，尚未接入 AI 模型或服务端数据库。
 
+## 当前批次：道路设施预标注复核
+
+本次任务以 `label/data` 中的文件为准。`data_for_annotation` 有 900 张普通 JPG 与同名 YOLO 标签，类别是 `sign`、`sign_s`、`fence`、`sign_p`、`fence_v`、`sign_d`、`pole`。启动后默认进入“道路设施复核”：可增删、移动、调整 2D 框，修正类别，筛选疑似重复框，逐张确认并导出 YOLO ZIP。具体定义和一致性规则见 [道路设施复核说明](docs/ROAD_FURNITURE_REVIEW.md)。这批目录没有点云文件；原有点云/全景联合工作台仍保留在导航中。
+
+真实道路设施图片、标签和 PPTX 只在本机读取，不提交仓库，也不进入 Windows/macOS 交付包。其他电脑运行时，在复核页选择 `data_for_annotation` 文件夹即可。模型仍未接入；当前复核的是文件中已有的预测结果。
+
 ## 本地打开
 
 需要 Node.js 20+。两平台共用同一套前端代码，提供分别可启动的交付 ZIP：
@@ -72,7 +78,8 @@ python .\scripts\prepare_vmms_sample.py
 
 ## 目录
 
-- `src/App.tsx`：任务管理、标注工具、属性面板、配准页和数据导入。
+- `src/App.tsx`：导航、原有联合标注工作台、任务管理和配准页。
+- `src/ImageReview.tsx`、`src/reviewData.ts`：道路设施 2D 预标注复核与 YOLO 导出。
 - `src/PointCloudView.tsx`：PCD/PLY 三维显示及 3D 框拾取。
 - `src/PanoramaView.tsx`：全景球面显示、点和多边形绘制、点云投影叠加。
 - `src/geometry.ts`：坐标变换、球面投影和近射线点查询。
