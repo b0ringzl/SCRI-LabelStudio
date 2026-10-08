@@ -38,7 +38,7 @@ ZIP 已包含构建结果与示例数据。启动脚本会在本机开启网页�
 
 GitHub 仓库默认提供 `public/demo-cloud.pcd` 和 `public/demo-panorama.png`，由 `python scripts/create_synthetic_demo.py` 生成，不对应任何真实地点。若本机源码目录存在 `public/sample-cloud.pcd` 和 `public/sample-panorama.jpg`，工作台优先打开真实裁剪样本；否则自动使用合成样本。真实样本已在 `.gitignore` 中排除，双平台 ZIP 打包脚本也默认排除它；发布前须单独确认数据分享权限。
 
-内置示例来自 `20250210-jianshazui` 的 Ladybug 全景帧 `001298`。`scripts/prepare_vmms_sample.py` 读取本机 TREE 项目的 `frame_coordinates.csv`，用该帧的插值 INS 位姿把相机附近 42 m 的映射点云变换为相机局部系，再从附近的降采样 PCD 中选取最多 100,000 点。处理后文件位于 `public/sample-cloud.pcd`、`public/sample-panorama.jpg` 和 `public/sample-metadata.json`。脚本只读取原始数据，不修改原目录。
+本机可选的真实示例来自 `20250210-jianshazui` 的 Ladybug 全景帧 `001298`。`scripts/prepare_vmms_sample.py` 读取本机 TREE 项目的 `frame_coordinates.csv`，用该帧的插值 INS 位姿把相机附近 42 m 的映射点云变换为相机局部系，再从附近的降采样 PCD 中选取最多 100,000 点。处理后文件位于 `public/sample-cloud.pcd`、`public/sample-panorama.jpg` 和 `public/sample-metadata.json`。脚本只读取原始数据，不修改原目录。
 
 局部坐标约定为 **+X 向右、+Y 向上、−Z 向前**。与 TREE 的 Ladybug 球面投影约定对应：
 
