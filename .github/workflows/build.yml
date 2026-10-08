@@ -1,0 +1,35 @@
+name: Build Windows and macOS packages
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.13'
+      - run: npm ci
+      - run: npm run build
+      - run: npm run package
+      - uses: actions/upload-artifact@v7
+        with:
+          name: AtlasStudio-Windows
+          path: release/AtlasStudio-Windows-v*.zip
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v7
+        with:
+          name: AtlasStudio-macOS
+          path: release/AtlasStudio-macOS-v*.zip
+          if-no-files-found: error
