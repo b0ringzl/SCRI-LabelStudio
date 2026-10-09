@@ -2,11 +2,13 @@ import { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { directionToPanorama, panoramaToDirection, pointToPanorama, registrationQuaternion } from './geometry';
 import type { Annotation, ClassDefinition, Registration, ToolMode, UV } from './types';
+const EMPTY_PREVIEWS: Annotation[] = [];
 
 interface Props {
   imageUrl: string;
   cloudGeometry: THREE.BufferGeometry | null;
   annotations: Annotation[];
+  previewAnnotations?: Annotation[];
   classes: ClassDefinition[];
   selectedId: string | null;
   registration: Registration;
@@ -33,7 +35,7 @@ function spherePoint(uv: UV, radius = 19.72) {
   return panoramaToDirection(uv).multiplyScalar(radius);
 }
 
-export default function PanoramaView({ imageUrl, cloudGeometry, annotations, classes, selectedId, registration, tool, draftVertices, showProjection, focus, onPick, onFinishPolygon }: Props) {
+export default function PanoramaView({ imageUrl, cloudGeometry, annotations, previewAnnotations = EMPTY_PREVIEWS, classes, selectedId, registration, tool, draftVertices, showProjection, focus, onPick, onFinishPolygon }: Props) {
   const host = useRef<HTMLDivElement>(null);
   const state = useRef<SceneState | null>(null);
   const pickRef = useRef(onPick);
@@ -184,21 +186,22 @@ export default function PanoramaView({ imageUrl, cloudGeometry, annotations, cla
       shape.renderOrder = 4;
       view.annotations.add(shape);
     };
-    for (const annotation of annotations) {
+    for (const annotation of [...annotations, ...previewAnnotations]) {
       if (!annotation.visible) continue;
-      const color = classes.find((item) => item.id === annotation.classId)?.color ?? '#ffffff';
+      const preview = previewAnnotations.includes(annotation);
+      const color = preview ? '#c3a4ff' : classes.find((item) => item.id === annotation.classId)?.color ?? '#ffffff';
       if (annotation.panorama?.kind === 'point') dot(annotation.panorama.uv, color, annotation.id === selectedId ? 0.26 : 0.16);
       if (annotation.panorama?.kind === 'polygon') {
         line(annotation.panorama.vertices, color, true);
         for (const uv of annotation.panorama.vertices) dot(uv, color, 0.1);
       }
-      if (annotation.pointCloud && !annotation.panorama) dot(pointToPanorama(annotation.pointCloud.center, registration), '#ffffff', 0.12);
+      if (annotation.pointCloud && !annotation.panorama) dot(pointToPanorama(annotation.pointCloud.center, registration), preview ? '#c3a4ff' : '#ffffff', 0.12);
     }
     if (draftVertices.length) {
       line(draftVertices, '#ffd37d');
       for (const uv of draftVertices) dot(uv, '#ffd37d', 0.11);
     }
-  }, [annotations, classes, selectedId, registration, draftVertices]);
+  }, [annotations, previewAnnotations, classes, selectedId, registration, draftVertices]);
 
   useEffect(() => {
     const view = state.current;

@@ -1,0 +1,25 @@
+.model-manager { display:grid; grid-template-columns:minmax(390px,1.3fr) minmax(300px,.8fr); gap:16px; align-items:start; }
+.model-manager-panel { border:1px solid #e4e9f1; border-radius:12px; background:white; padding:21px; box-shadow:0 3px 10px #22334a09; }
+.model-manager-panel h2 { margin:0 0 8px; color:#2d3850; font-size:17px; }
+.model-manager-panel > p { color:#8090a5; font-size:12px; line-height:1.6; }
+.model-kind { margin-top:20px; border-top:1px solid #edf0f5; }
+.model-kind-head { display:flex; justify-content:space-between; gap:8px; align-items:center; padding:15px 0 7px; }
+.model-kind-head strong { color:#47566e; font-size:12px; }
+.model-kind-head span { color:#958bbb; font-size:10px; }
+.model-row { display:flex; gap:6px; align-items:center; padding:8px; margin-top:6px; border:1px solid #e6e9f2; border-radius:8px; }
+.model-row label { flex:1; display:flex; align-items:center; gap:9px; min-width:0; cursor:pointer; }
+.model-row input { accent-color:#7367dc; }
+.model-row label span { display:flex; flex-direction:column; gap:4px; min-width:0; }
+.model-row label strong { font-size:12px; color:#354157; }
+.model-row label small { overflow:hidden; white-space:nowrap; text-overflow:ellipsis; color:#9aa7b8; font-size:10px; }
+.model-row button { border:0; background:transparent; color:#7268c5; padding:5px; font-size:11px; }
+.model-empty { color:#a1acba; font-size:11px; }
+.model-form { display:flex; flex-direction:column; gap:13px; }
+.model-form label { display:flex; flex-direction:column; gap:6px; color:#627189; font-size:11px; font-weight:700; }
+.model-form input,.model-form select { width:100%; border:1px solid #dce3ed; border-radius:7px; padding:10px; color:#334158; background:white; font-size:12px; }
+.model-form > small { color:#9aa8ba; font-size:10px; line-height:1.6; }
+.model-form-error { color:#bd5260!important; margin:0; }
+.model-form-actions { display:flex; gap:8px; }
+.model-form-actions button { border:1px solid #dce2ed; border-radius:7px; padding:9px 12px; background:white; color:#7467ce; display:flex; align-items:center; gap:5px; font-size:11px; font-weight:700; }
+.model-form-actions button:first-child { border-color:#7367dc; background:#7367dc; color:white; }
+@media(max-width:1050px){.model-manager{grid-template-columns:1fr}}
