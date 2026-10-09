@@ -23,6 +23,8 @@ ZIP 已包含构建结果与示例数据。启动脚本会在本机开启网页�
 
 ## GitHub 协作
 
+本轮道路设施复核、模型切换和千问／DeepSeek 接入的逐提交说明见 [2026-10-09 合并说明](docs/MERGE_NOTES_2026-10-09.md)。
+
 源码、可共享的合成演示数据、双平台启动脚本和打包脚本可放入同一个 GitHub 仓库。`node_modules/`、`dist/`、`release/` 及真实尖沙咀裁剪样本不提交；每次推送或发起 PR 后，[构建工作流](.github/workflows/build.yml)检查 TypeScript 和打包，并上传两个 ZIP 作为 Actions artifacts。协作者按 [贡献指南](CONTRIBUTING.md)提交 PR。模型与界面协作分别参阅 [模型接口契约](docs/MODEL_API.md) 和 [UI 设计说明](docs/UI_DESIGN.md)。
 
 ## 已实现的工作流

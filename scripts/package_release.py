@@ -45,6 +45,7 @@ def package(platform: str, launcher: str, readme: str) -> Path:
         add_file(archive, ROOT / "docs" / "ROAD_FURNITURE_REVIEW.md", f"{folder}/docs/ROAD_FURNITURE_REVIEW.md")
         add_file(archive, ROOT / "docs" / "MODEL_API.md", f"{folder}/docs/MODEL_API.md")
         add_file(archive, ROOT / "docs" / "MODEL_SWITCHING.md", f"{folder}/docs/MODEL_SWITCHING.md")
+        add_file(archive, ROOT / "docs" / "MERGE_NOTES_2026-10-09.md", f"{folder}/docs/MERGE_NOTES_2026-10-09.md")
         add_file(archive, ROOT / "docs" / "LLM_PROVIDERS.md", f"{folder}/docs/LLM_PROVIDERS.md")
         add_file(archive, ROOT / "docs" / "UI_DESIGN.md", f"{folder}/docs/UI_DESIGN.md")
         add_file(archive, ROOT / "docs" / "UI_ARCHITECTURE.md", f"{folder}/docs/UI_ARCHITECTURE.md")
