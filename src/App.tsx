@@ -11,12 +11,20 @@ import {
   Tag, Target, Trash2, WandSparkles, Paintbrush, X,
 } from 'lucide-react';
 import { demoTask, syntheticDemoTask, initialAnnotations, initialClasses, initialRegistration } from './demo';
+import ImageReview from './ImageReview';
+import ModelSettings from './ModelSettings';
+import PairModelBar from './PairModelBar';
+import { runVisionLlm, validatePairPrediction } from './modelApi';
+import { loadModelProfiles, loadModelSelection } from './modelRegistry';
+import type { ModelModality, ModelProfile } from './modelRegistry';
+import { createHttpPrelabelProvider, uploadPrelabelAsset } from './prelabel';
 import { nearestPointOnRay, panoramaToWorldDirection, pointToPanorama } from './geometry';
 import PanoramaView from './PanoramaView';
 import PointCloudView from './PointCloudView';
 import type { Annotation, ClassDefinition, Cuboid, Page, PairTask, Registration, ToolMode, UV, Vec3 } from './types';
 
 const NAV: { page: Page; label: string; icon: typeof Database; group?: string }[] = [
+  { page: 'review', label: '道路设施复核', icon: Image, group: '当前任务' },
   { page: 'workspace', label: '标注工作台', icon: ScanLine, group: '工作空间' },
   { page: 'tasks', label: '任务列表', icon: Layers3 },
   { page: 'sources', label: '数据源', icon: Database },
@@ -55,7 +63,7 @@ function downloadJson(filename: string, data: unknown) {
 function formatNumber(value: number) { return Number.isFinite(value) ? value.toFixed(2) : '—'; }
 
 export default function App() {
-  const [page, setPage] = useState<Page>('workspace');
+  const [page, setPage] = useState<Page>('review');
   const [tasks, setTasks] = useState<PairTask[]>([demoTask]);
   const [activeTaskId, setActiveTaskId] = useState(demoTask.id);
   const task = tasks.find((item) => item.id === activeTaskId) ?? demoTask;
@@ -78,7 +86,13 @@ export default function App() {
   const [dirty, setDirty] = useState(false);
   const [search, setSearch] = useState('');
   const [newClassName, setNewClassName] = useState('');
-  const [modelEndpoint, setModelEndpoint] = useState(() => localStorage.getItem('atlas-model-endpoint') ?? '');
+  const [modelProfiles, setModelProfiles] = useState<ModelProfile[]>(loadModelProfiles);
+  const [selectedModels, setSelectedModels] = useState<Record<ModelModality, string>>(loadModelSelection);
+  const [pairCandidates, setPairCandidates] = useState<Annotation[]>([]);
+  const [pairPointCandidates, setPairPointCandidates] = useState<Array<{ pointIndex: number; classId: string }>>([]);
+  const [pairModelVersion, setPairModelVersion] = useState('');
+  const [pairRunning, setPairRunning] = useState(false);
+  const pairAbort = useRef<AbortController | null>(null);
   const [cloudFile, setCloudFile] = useState<File | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [calibrationFile, setCalibrationFile] = useState<File | null>(null);
@@ -86,6 +100,9 @@ export default function App() {
   const [sideOpen, setSideOpen] = useState(true);
   const [selectedTab, setSelectedTab] = useState<'objects' | 'attributes'>('objects');
   const selected = annotations.find((item) => item.id === selectedId) ?? null;
+  const pairPreviewPointLabels = useMemo(() => Object.fromEntries(pairPointCandidates.map((item) =>
+    [String(item.pointIndex), item.classId])), [pairPointCandidates]);
+  const selectedPairModel = modelProfiles.find((item) => item.id === selectedModels.paired3d && item.modality === 'paired3d');
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -129,7 +146,17 @@ export default function App() {
   }, [task.id, task.pointCloudUrl, task.pointCloudName]);
 
   useEffect(() => { localStorage.setItem('atlas-classes', JSON.stringify(classes)); }, [classes]);
-  useEffect(() => { localStorage.setItem('atlas-model-endpoint', modelEndpoint); }, [modelEndpoint]);
+  useEffect(() => { localStorage.setItem('atlas-model-profiles-v1', JSON.stringify(modelProfiles)); }, [modelProfiles]);
+  useEffect(() => { localStorage.setItem('atlas-selected-models-v1', JSON.stringify(selectedModels)); }, [selectedModels]);
+  useEffect(() => () => pairAbort.current?.abort(), []);
+  useEffect(() => {
+    pairAbort.current?.abort();
+    pairAbort.current = null;
+    setPairRunning(false);
+    setPairCandidates([]);
+    setPairPointCandidates([]);
+    setPairModelVersion('');
+  }, [task.id, selectedModels.paired3d, registration, classes]);
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null;
@@ -198,6 +225,93 @@ export default function App() {
     } catch {
       flash('浏览器存储空间不足；请先导出 JSON，减少逐点标注量后重试');
     }
+  }
+
+  async function runPairModel() {
+    if (!selectedPairModel || !geometry || !task.pointCloudUrl || pairRunning) return;
+    const controller = new AbortController();
+    pairAbort.current = controller;
+    setPairRunning(true);
+    flash(`正在调用 ${selectedPairModel.name}…`);
+    try {
+      if (selectedPairModel.adapter === 'qwen-vl-v1' || selectedPairModel.adapter === 'deepseek-vision-v1') {
+        const panoramaResponse = await fetch(task.panoramaUrl, { signal: controller.signal });
+        if (!panoramaResponse.ok) throw new Error('当前全景影像无法读取');
+        const output = await runVisionLlm(selectedPairModel, await panoramaResponse.blob(), classes, 'panorama', controller.signal);
+        if (controller.signal.aborted) return;
+        setPairCandidates(output.boxes.map((box) => {
+          const left = box.x - box.w / 2, right = box.x + box.w / 2;
+          const top = box.y - box.h / 2, bottom = box.y + box.h / 2;
+          return { id: `candidate:${crypto.randomUUID()}`, classId: box.classId,
+            name: classes.find((entry) => entry.id === box.classId)?.name ?? box.classId,
+            visible: true, origin: 'prediction' as const, modelId: selectedPairModel.id,
+            modelVersion: output.modelVersion,
+            panorama: { kind: 'polygon' as const, vertices: [[left, top], [right, top], [right, bottom], [left, bottom]] as [number, number][] } };
+        }));
+        setPairPointCandidates([]);
+        setPairModelVersion(output.modelVersion ?? selectedPairModel.name);
+        flash(`收到 ${output.boxes.length} 个全景区域候选；请在影像中审核。LLM 不生成点云 3D 框。`);
+        return;
+      }
+      const [cloudResponse, panoramaResponse] = await Promise.all([
+        fetch(task.pointCloudUrl, { signal: controller.signal }),
+        fetch(task.panoramaUrl, { signal: controller.signal }),
+      ]);
+      if (!cloudResponse.ok || !panoramaResponse.ok) throw new Error('当前配对文件无法读取');
+      const [cloudBlob, panoramaBlob] = await Promise.all([cloudResponse.blob(), panoramaResponse.blob()]);
+      const cloudAssetId = await uploadPrelabelAsset(selectedPairModel.endpoint,
+        new File([cloudBlob], task.pointCloudName), 'pointCloud', controller.signal);
+      const panoramaAssetId = await uploadPrelabelAsset(selectedPairModel.endpoint,
+        new File([panoramaBlob], task.panoramaName), 'panorama', controller.signal);
+      const pointCount = geometry.getAttribute('position').count;
+      const output = validatePairPrediction(await createHttpPrelabelProvider(selectedPairModel.endpoint).predict({
+        schemaVersion: '0.2', taskId: task.id, pointCloudAssetId: cloudAssetId, panoramaAssetId,
+        pointCount, coordinateSystem: task.isDemo || task.id === syntheticDemoTask.id
+          ? 'camera-local: +X right, +Y up, -Z forward' : 'source point-cloud coordinates',
+        registration, classes,
+      }, controller.signal), classes.map((item) => item.id), pointCount);
+      if (controller.signal.aborted) return;
+      setPairCandidates(output.annotations.map((item) => ({ ...item, id: `candidate:${crypto.randomUUID()}`,
+        name: item.name || classes.find((entry) => entry.id === item.classId)?.name || '候选对象',
+        visible: true, origin: 'prediction', modelId: selectedPairModel.id, modelVersion: output.modelVersion })));
+      setPairPointCandidates(output.semanticPointLabels ?? []);
+      setPairModelVersion(output.modelVersion ?? selectedPairModel.name);
+      flash(`收到 ${output.annotations.length} 个候选对象、${output.semanticPointLabels?.length ?? 0} 个逐点类别；请审核。`);
+    } catch (error) {
+      if (!controller.signal.aborted) flash(`模型运行失败：${error instanceof Error ? error.message : '未知错误'}`);
+    } finally {
+      if (pairAbort.current === controller) { pairAbort.current = null; setPairRunning(false); }
+    }
+  }
+
+  function acceptPairCandidate(id: string) {
+    const candidate = pairCandidates.find((item) => item.id === id);
+    if (!candidate) return;
+    mutateAnnotations((previous) => [...previous, { ...candidate, id: generateId(previous) }]);
+    setPairCandidates((previous) => previous.filter((item) => item.id !== id));
+  }
+
+  function acceptAllPairCandidates() {
+    if (!pairCandidates.length) return;
+    mutateAnnotations((previous) => {
+      const next = [...previous];
+      for (const candidate of pairCandidates) next.push({ ...candidate, id: generateId(next) });
+      return next;
+    });
+    setPairCandidates([]);
+  }
+
+  function acceptPairPoints() {
+    if (!pairPointCandidates.length) return;
+    let added = 0;
+    const next = { ...semanticLabels };
+    for (const item of pairPointCandidates) {
+      if (next[item.pointIndex] === undefined) { next[item.pointIndex] = item.classId; added++; }
+    }
+    setSemanticLabels(next);
+    setPairPointCandidates([]);
+    setDirty(true);
+    flash(`已接受 ${added} 个未人工标注的点；已有逐点标签保持原样`);
   }
 
   function selectTask(next: PairTask) {
@@ -393,17 +507,17 @@ export default function App() {
   );
 
   return <div className="app-shell">
-    <aside className="sidebar"><div className="brand"><span className="brand-mark"><Layers3 size={19} strokeWidth={2.5} /></span><div><strong>Atlas Studio</strong><small>MULTIMODAL LABELING</small></div></div><div className="project-picker"><div className="project-icon"><MapPin size={17} /></div><div><small>当前项目</small><strong>城市空间要素标注</strong></div><ChevronDown size={14} /></div><nav className="side-nav">{NAV.map(({ page: navPage, label, icon: Icon, group }) => <div key={navPage}>{group && <div className="nav-group">{group}</div>}<button className={`nav-item ${page === navPage ? 'active' : ''}`} onClick={() => { setPage(navPage); if (navPage === 'registration') setSideOpen(true); }}><Icon size={18} /><span>{label}</span>{navPage === 'tasks' && <small>{tasks.length}</small>}</button></div>)}</nav><div className="sidebar-bottom"><div className="pipeline-card"><span className="pipeline-icon"><WandSparkles size={17} /></span><strong>AI 预标注</strong><p>接口已预留，连接模型后可在工作台调用。</p><button onClick={() => setPage('models')}>配置接口 <ArrowRight size={14} /></button></div><button className="help-link" onClick={() => flash('当前为前端原型；操作说明见项目 README')}><CircleHelp size={17} />帮助与文档</button><div className="profile"><span>AT</span><div><strong>标注员</strong><small>本地工作空间</small></div><MoreHorizontal size={17} /></div></div></aside>
+    <aside className="sidebar"><div className="brand"><span className="brand-mark"><Layers3 size={19} strokeWidth={2.5} /></span><div><strong>Atlas Studio</strong><small>MULTIMODAL LABELING</small></div></div><div className="project-picker"><div className="project-icon"><MapPin size={17} /></div><div><small>当前项目</small><strong>城市空间要素标注</strong></div><ChevronDown size={14} /></div><nav className="side-nav">{NAV.map(({ page: navPage, label, icon: Icon, group }) => <div key={navPage}>{group && <div className="nav-group">{group}</div>}<button className={`nav-item ${page === navPage ? 'active' : ''}`} onClick={() => { setPage(navPage); if (navPage === 'registration') setSideOpen(true); }}><Icon size={18} /><span>{label}</span>{navPage === 'tasks' && <small>{tasks.length}</small>}</button></div>)}</nav><div className="sidebar-bottom"><div className="pipeline-card"><span className="pipeline-icon"><WandSparkles size={17} /></span><strong>AI 预标注</strong><p>可配置多个模型服务，并在对应工作台切换。</p><button onClick={() => setPage('models')}>配置接口 <ArrowRight size={14} /></button></div><button className="help-link" onClick={() => flash('当前为前端原型；操作说明见项目 README')}><CircleHelp size={17} />帮助与文档</button><div className="profile"><span>AT</span><div><strong>标注员</strong><small>本地工作空间</small></div><MoreHorizontal size={17} /></div></div></aside>
     <div className="main-shell"><header className="topbar"><div className="crumb"><span>城市空间要素标注</span><ChevronRight size={15} /><strong>{NAV.find((item) => item.page === page)?.label}</strong></div><div className="top-actions"><span className="prototype-pill"><span /> 原型环境</span><button className="top-icon" onClick={() => flash('当前无通知')} title="系统状态"><Activity size={18} /></button><span className="avatar">AT</span></div></header>
       {(page === 'workspace' || page === 'registration') ? <><div className="task-header"><div className="task-header-main"><button className="back-button" onClick={() => setPage('tasks')} title="返回任务列表"><ArrowLeft size={18} /></button><div><div className="eyebrow">ANNOTATION WORKSPACE <span> / {task.id}</span></div><h1>{task.name}</h1><div className="task-meta"><span><MapPin size={14} />{task.location}</span><span className="meta-divider" /><span><CheckCircle2 size={14} />双模态配对</span><span className="meta-divider" /><span>{annotations.length} 个标注对象</span></div></div></div><div className="task-header-actions"><button className="button button-light" onClick={exportData}><ArrowDownToLine size={16} />导出结果</button><button className="button button-primary" onClick={save}><Save size={16} />{dirty ? '保存更改' : '已保存'}</button></div></div>
-        <div className="work-area"><main className="workspace"><div className="workspace-tools"><div className="tool-group">{TOOLS.map(({ mode, label, icon: Icon, hint }) => <button key={mode} className={`tool-button ${tool === mode ? 'active' : ''}`} title={hint} onClick={() => { if (draftVertices.length && mode !== 'pano-polygon') setDraftVertices([]); setTool(mode); if (mode === 'cloud-paint') setSelectedTab('objects'); }}><Icon size={17} />{label}</button>)}</div><div className="tool-trailing"><button className={`projection-button ${showProjection ? 'active' : ''}`} onClick={() => setShowProjection(!showProjection)} title="将点云投影到全景，校验配准"><Radar size={17} />投影核验</button><span className="tool-separator" /><button className="ai-button" onClick={() => { setPage('models'); flash('先配置预标注接口；当前没有接入模型'); }}><Sparkles size={16} />AI 预标注 <span>待接入</span></button></div></div><div className="instruction-strip"><span className="instruction-symbol"><CircleHelp size={16} /></span><span>{TOOLS.find((item) => item.mode === tool)?.hint}。选择右侧已有对象后在另一视图绘制，可关联同一个对象 ID。</span>{draftVertices.length > 0 && <button onClick={finishPolygon}>完成多边形 ({draftVertices.length} 点)</button>}</div>
-          <div className="split-view"><section className="viewport-card"><div className="viewport-head"><div className="viewport-heading"><span className="view-icon cloud"><Box size={18} /></span><div><strong>三维点云</strong><small>POINT CLOUD · PCD</small></div></div><div className="viewport-head-right"><span className="view-count">{geometry?.getAttribute('position')?.count.toLocaleString() ?? '—'} 点</span><button className="icon-button" onClick={() => flash('3D 框：框选拟合后拖动移动、尺寸、旋转手柄；点云涂抹：选类后拖动，Shift 框选，Alt 擦除')} title="视图操作"><Maximize2 size={16} /></button></div></div><div className="viewport-body"><PointCloudView geometry={geometry} annotations={annotations} classes={classes} semanticLabels={semanticLabels} selectedId={selectedId} registration={registration} tool={tool} focusSelected={focusSelected} onToggleFocus={() => setFocusSelected((value) => !value)} onCreate={onPointCloudPick} onUpdate={(id, box) => updateAnnotation(id, { pointCloud: box })} onPaint={paintPoints} onUndoPaint={undoPaint} canUndoPaint={paintHistory.length > 0} onSelect={onPointCloudSelect} onEmptySelection={() => flash("选区没有找到足够的点；请扩大范围或切换俯视视角")} />{!geometry && <div className="viewer-loading">{loadError ? `加载失败：${loadError}` : '正在加载点云…'}</div>}<div className="view-overlay top-left"><span className="live-dot" />{task.id === syntheticDemoTask.id ? '合成演示数据' : task.isDemo ? '真实样本 · 局部降采样' : '本地配对数据'}</div><div className="view-overlay bottom-left">左键旋转 · 滚轮缩放 · 右键平移</div><div className="axis-legend"><i className="axis-x" />X <i className="axis-y" />Y <i className="axis-z" />Z</div></div><div className="viewport-foot"><span><span className="tiny-color cloud" />{task.pointCloudName}</span><span>{geometry ? '已加载' : '加载中'}</span></div></section>
+        <div className="work-area"><main className="workspace"><div className="workspace-tools"><div className="tool-group">{TOOLS.map(({ mode, label, icon: Icon, hint }) => <button key={mode} className={`tool-button ${tool === mode ? 'active' : ''}`} title={hint} onClick={() => { if (draftVertices.length && mode !== 'pano-polygon') setDraftVertices([]); setTool(mode); if (mode === 'cloud-paint') setSelectedTab('objects'); }}><Icon size={17} />{label}</button>)}</div><div className="tool-trailing"><button className={`projection-button ${showProjection ? 'active' : ''}`} onClick={() => setShowProjection(!showProjection)} title="将点云投影到全景，校验配准"><Radar size={17} />投影核验</button><span className="tool-separator" /><button className="ai-button" onClick={() => setPage('models')}><Sparkles size={16} />AI 预标注 <span>可配置</span></button></div></div><div className="instruction-strip"><span className="instruction-symbol"><CircleHelp size={16} /></span><span>{TOOLS.find((item) => item.mode === tool)?.hint}。选择右侧已有对象后在另一视图绘制，可关联同一个对象 ID。</span>{draftVertices.length > 0 && <button onClick={finishPolygon}>完成多边形 ({draftVertices.length} 点)</button>}</div>
+          <PairModelBar models={modelProfiles} selectedModelId={selectedPairModel?.id ?? ""} onSelectModel={(id) => setSelectedModels((previous) => ({ ...previous, paired3d: id }))} onOpenSettings={() => setPage("models")} onRun={() => void runPairModel()} onCancel={() => pairAbort.current?.abort()} running={pairRunning} ready={Boolean(geometry)} candidates={pairCandidates} pointCandidateCount={pairPointCandidates.length} modelVersion={pairModelVersion} classes={classes} onFocus={(candidate) => { if (candidate.panorama?.kind === "point") setFocus({ uv: candidate.panorama.uv, serial: Date.now() }); else if (candidate.panorama?.kind === "polygon") setFocus({ uv: candidate.panorama.vertices[0], serial: Date.now() }); else if (candidate.pointCloud) setFocus({ uv: pointToPanorama(candidate.pointCloud.center, registration), serial: Date.now() }); }} onAccept={acceptPairCandidate} onReject={(id) => setPairCandidates((previous) => previous.filter((item) => item.id !== id))} onAcceptAll={acceptAllPairCandidates} onRejectAll={() => setPairCandidates([])} onAcceptPoints={acceptPairPoints} onRejectPoints={() => setPairPointCandidates([])} /><div className="split-view"><section className="viewport-card"><div className="viewport-head"><div className="viewport-heading"><span className="view-icon cloud"><Box size={18} /></span><div><strong>三维点云</strong><small>POINT CLOUD · PCD</small></div></div><div className="viewport-head-right"><span className="view-count">{geometry?.getAttribute('position')?.count.toLocaleString() ?? '—'} 点</span><button className="icon-button" onClick={() => flash('3D 框：框选拟合后拖动移动、尺寸、旋转手柄；点云涂抹：选类后拖动，Shift 框选，Alt 擦除')} title="视图操作"><Maximize2 size={16} /></button></div></div><div className="viewport-body"><PointCloudView geometry={geometry} annotations={annotations} previewAnnotations={pairCandidates} classes={classes} semanticLabels={semanticLabels} previewSemanticLabels={pairPreviewPointLabels} selectedId={selectedId} registration={registration} tool={tool} focusSelected={focusSelected} onToggleFocus={() => setFocusSelected((value) => !value)} onCreate={onPointCloudPick} onUpdate={(id, box) => updateAnnotation(id, { pointCloud: box })} onPaint={paintPoints} onUndoPaint={undoPaint} canUndoPaint={paintHistory.length > 0} onSelect={onPointCloudSelect} onEmptySelection={() => flash("选区没有找到足够的点；请扩大范围或切换俯视视角")} />{!geometry && <div className="viewer-loading">{loadError ? `加载失败：${loadError}` : '正在加载点云…'}</div>}<div className="view-overlay top-left"><span className="live-dot" />{task.id === syntheticDemoTask.id ? '合成演示数据' : task.isDemo ? '真实样本 · 局部降采样' : '本地配对数据'}</div><div className="view-overlay bottom-left">左键旋转 · 滚轮缩放 · 右键平移</div><div className="axis-legend"><i className="axis-x" />X <i className="axis-y" />Y <i className="axis-z" />Z</div></div><div className="viewport-foot"><span><span className="tiny-color cloud" />{task.pointCloudName}</span><span>{geometry ? '已加载' : '加载中'}</span></div></section>
           <div className="pair-bridge"><span><Link2 size={17} /></span></div>
-          <section className="viewport-card"><div className="viewport-head"><div className="viewport-heading"><span className="view-icon pano"><Image size={18} /></span><div><strong>全景影像</strong><small>PANORAMA · 360°</small></div></div><div className="viewport-head-right"><span className="view-count">等距柱状投影</span><button className="icon-button" onClick={() => setFocus({ uv: [0.5, 0.5], serial: Date.now() })} title="回到正前方"><Focus size={16} /></button></div></div><div className="viewport-body"><PanoramaView imageUrl={task.panoramaUrl} cloudGeometry={geometry} annotations={annotations} classes={classes} selectedId={selectedId} registration={registration} tool={tool} draftVertices={draftVertices} showProjection={showProjection} focus={focus} onPick={onPanoramaPick} onFinishPolygon={finishPolygon} /><div className="view-overlay top-left"><span className="live-dot cyan" />{showProjection ? '点云投影叠加 · 核验中' : '球面交互视图'}</div><div className="view-overlay bottom-left">拖拽环视 · 滚轮调整视角</div><div className="compass">N <span>·</span> 360°</div></div><div className="viewport-foot"><span><span className="tiny-color pano" />{task.panoramaName}</span><span>已配对</span></div></section></div>
-          <div className="registration-bar"><span className="registration-emblem"><Crosshair size={18} /></span><div><strong>{task.isDemo ? 'INS 位姿粗配准' : '手动位姿配准'}</strong><p>{task.isDemo ? '依据 TREE 项目逐帧轨迹与 Ladybug 球面公式建立初始对应；未包含相机杆臂和安装角外参。' : '根据导入的相机位姿进行 3D→全景投影；建议用可辨认地物核验并微调。'}</p></div><button onClick={() => { setPage('registration'); setSideOpen(true); setShowProjection(true); }}>校验与微调 <ArrowRight size={15} /></button></div></main>{inspector}</div></> : <div className="content-page">{page === 'tasks' && <><PageHeading eyebrow="DATA MANAGER" title="任务列表" description="每个任务是一组同步采样的点云与全景影像，标注结果以同一个对象 ID 在两种视图中关联。" action={<button className="button button-primary" onClick={() => setPage('sources')}><Plus size={16} />新建配对任务</button>} /><div className="summary-grid"><SummaryCard icon={Layers3} label="配对任务" value={String(tasks.length)} tone="purple" /><SummaryCard icon={Box} label="当前任务点云" value={geometry ? `${Math.round(geometry.getAttribute('position').count / 1000)}k` : '—'} tone="blue" /><SummaryCard icon={Tag} label="当前标注对象" value={String(annotations.length)} tone="green" /></div><div className="table-card"><div className="table-title"><strong>全部任务</strong><span>{tasks.length} 项</span></div><div className="task-table-header"><span>任务名称</span><span>数据组合</span><span>标注进度</span><span>操作</span></div>{tasks.map((item) => <div className="task-table-row" key={item.id}><div><span className="table-task-icon"><Layers3 size={18} /></span><span><strong>{item.name}</strong><small>{item.id} · {item.location}</small></span></div><div className="file-pair"><span><Box size={14} />PCD / PLY</span><span><Image size={14} />JPG / PNG</span></div><div><span className="status-tag">{item.id === task.id && annotations.length ? '标注中' : '待标注'}</span></div><button onClick={() => selectTask(item)}>打开工作台 <ArrowRight size={15} /></button></div>)}</div></>}
+          <section className="viewport-card"><div className="viewport-head"><div className="viewport-heading"><span className="view-icon pano"><Image size={18} /></span><div><strong>全景影像</strong><small>PANORAMA · 360°</small></div></div><div className="viewport-head-right"><span className="view-count">等距柱状投影</span><button className="icon-button" onClick={() => setFocus({ uv: [0.5, 0.5], serial: Date.now() })} title="回到正前方"><Focus size={16} /></button></div></div><div className="viewport-body"><PanoramaView imageUrl={task.panoramaUrl} cloudGeometry={geometry} annotations={annotations} previewAnnotations={pairCandidates} classes={classes} selectedId={selectedId} registration={registration} tool={tool} draftVertices={draftVertices} showProjection={showProjection} focus={focus} onPick={onPanoramaPick} onFinishPolygon={finishPolygon} /><div className="view-overlay top-left"><span className="live-dot cyan" />{showProjection ? '点云投影叠加 · 核验中' : '球面交互视图'}</div><div className="view-overlay bottom-left">拖拽环视 · 滚轮调整视角</div><div className="compass">N <span>·</span> 360°</div></div><div className="viewport-foot"><span><span className="tiny-color pano" />{task.panoramaName}</span><span>已配对</span></div></section></div>
+          <div className="registration-bar"><span className="registration-emblem"><Crosshair size={18} /></span><div><strong>{task.isDemo ? 'INS 位姿粗配准' : '手动位姿配准'}</strong><p>{task.isDemo ? '依据 TREE 项目逐帧轨迹与 Ladybug 球面公式建立初始对应；未包含相机杆臂和安装角外参。' : '根据导入的相机位姿进行 3D→全景投影；建议用可辨认地物核验并微调。'}</p></div><button onClick={() => { setPage('registration'); setSideOpen(true); setShowProjection(true); }}>校验与微调 <ArrowRight size={15} /></button></div></main>{inspector}</div></> : <div className="content-page">{page === 'review' && <ImageReview models={modelProfiles} selectedModelId={selectedModels.image2d} onSelectModel={(id) => setSelectedModels((previous) => ({ ...previous, image2d: id }))} onOpenSettings={() => setPage("models")} />}{page === 'tasks' && <><PageHeading eyebrow="DATA MANAGER" title="任务列表" description="每个任务是一组同步采样的点云与全景影像，标注结果以同一个对象 ID 在两种视图中关联。" action={<button className="button button-primary" onClick={() => setPage('sources')}><Plus size={16} />新建配对任务</button>} /><div className="summary-grid"><SummaryCard icon={Layers3} label="配对任务" value={String(tasks.length)} tone="purple" /><SummaryCard icon={Box} label="当前任务点云" value={geometry ? `${Math.round(geometry.getAttribute('position').count / 1000)}k` : '—'} tone="blue" /><SummaryCard icon={Tag} label="当前标注对象" value={String(annotations.length)} tone="green" /></div><div className="table-card"><div className="table-title"><strong>全部任务</strong><span>{tasks.length} 项</span></div><div className="task-table-header"><span>任务名称</span><span>数据组合</span><span>标注进度</span><span>操作</span></div>{tasks.map((item) => <div className="task-table-row" key={item.id}><div><span className="table-task-icon"><Layers3 size={18} /></span><span><strong>{item.name}</strong><small>{item.id} · {item.location}</small></span></div><div className="file-pair"><span><Box size={14} />PCD / PLY</span><span><Image size={14} />JPG / PNG</span></div><div><span className="status-tag">{item.id === task.id && annotations.length ? '标注中' : '待标注'}</span></div><button onClick={() => selectTask(item)}>打开工作台 <ArrowRight size={15} /></button></div>)}</div></>}
       {page === 'sources' && <><PageHeading eyebrow="DATA SOURCES" title="导入配对数据" description="选择同一采样站点的点云和全景文件。浏览器原型按任务配对，不会修改原始数据。" /><div className="source-layout"><div className="source-card"><div className="source-card-heading"><span className="step-number">01</span><div><strong>创建点云 / 全景任务</strong><p>支持 PCD、PLY 与 JPG、PNG 等距柱状全景图</p></div></div><label className="field-label">任务名称<input value={newTaskName} onChange={(event) => setNewTaskName(event.target.value)} placeholder="例如：尖沙咀街区 · 站点 002" /></label><div className="upload-pair"><label className={`upload-box ${cloudFile ? 'has-file' : ''}`}><input type="file" accept=".pcd,.ply" onChange={(event) => setCloudFile(event.target.files?.[0] ?? null)} /><Box size={25} /><strong>{cloudFile?.name ?? '选择点云文件'}</strong><span>PCD / PLY · 最大 150 MB</span></label><span className="upload-link"><Link2 size={17} /></span><label className={`upload-box ${imageFile ? 'has-file' : ''}`}><input type="file" accept="image/jpeg,image/png,.jpg,.jpeg,.png" onChange={(event) => setImageFile(event.target.files?.[0] ?? null)} /><Image size={25} /><strong>{imageFile?.name ?? '选择全景影像'}</strong><span>JPG / PNG · 2:1 等距柱状</span></label></div><label className="calibration-upload"><FileJson size={20} /><span><strong>{calibrationFile?.name ?? '可选：导入配准 JSON'}</strong><small>字段：position [x,y,z]、rotation [yaw,pitch,roll]（角度）</small></span><input type="file" accept=".json,application/json" onChange={(event) => setCalibrationFile(event.target.files?.[0] ?? null)} /><Plus size={17} /></label><button className="button button-primary create-task" onClick={importPair}><FileUp size={17} />创建并进入标注工作台</button></div><div className="source-help"><div className="source-help-icon"><Radar size={22} /></div><h3>配准数据如何工作？</h3><p>点云坐标与全景相机需要处于同一个坐标系。导入相机位姿后，工作台可以将 3D 点投影到球面全景进行核验。</p><div className="code-block">{'{\n  "position": [0, 0, 0],\n  "rotation": [0, 0, 0]\n}'}</div><p className="minor">未提供完整外参时，可以先导入粗位姿，然后在“配准校验”中逐项微调。</p></div></div></>}
       {page === 'ontology' && <><PageHeading eyebrow="ONTOLOGY" title="标签体系" description="建筑组件、标志和地物共享一套类别。所有标注对象都保留稳定 ID，便于关联点云与影像结果。" /><div className="ontology-card"><div className="table-title"><strong>当前类别</strong><span>{classes.length} 类</span></div>{classes.map((definition) => <div className="ontology-row" key={definition.id}><span className="class-dot large" style={{ background: definition.color }} /><div><strong>{definition.name}</strong><small>{definition.id}</small></div><span className="ontology-hotkey">快捷键 {definition.shortcut}</span><span className="enabled-pill">已启用</span></div>)}<div className="ontology-add"><input value={newClassName} onChange={(event) => setNewClassName(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') addClass(); }} placeholder="新增类别名称，例如：路灯" /><button className="button button-primary" onClick={addClass}><Plus size={16} />添加类别</button></div></div></>}
-      {page === 'models' && <><PageHeading eyebrow="AI PRELABELING" title="预标注接口" description="模型暂未接入。这里定义点云、全景与联合模型的上传和预测边界。" /><div className="model-layout"><div className="model-card"><div className="model-icon"><WandSparkles size={23} /></div><h3>HTTP 推理服务</h3><p>未来先通过 <code>POST /assets</code> 上传配对文件，再用资产 ID、配准位姿与类别表调用 <code>POST /predict</code>。本地 blob: 地址不能直接交给服务端。</p><label className="field-label">服务根地址<input value={modelEndpoint} onChange={(event) => setModelEndpoint(event.target.value)} placeholder="https://your-model-service.example/api" /></label><div className="model-status"><span className="status-dot amber" /><strong>{modelEndpoint ? '已填写地址 · 未验证连接' : '未连接模型'}</strong><span>当前不会上传文件或发起推理请求</span></div></div><div className="model-contract"><div className="table-title"><strong>接口契约</strong><span>v0.2</span></div><div className="contract-line"><span>上传</span><code>POST /assets → assetId</code></div><div className="contract-line"><span>预测</span><code>POST /predict</code></div><div className="contract-line"><span>输入</span><code>taskId · assetIds · registration · classes · pointCount</code></div><div className="contract-line"><span>输出</span><code>annotations[] · semanticPointLabels[] · modelVersion</code></div><p>预测结果沿用人工标注结构并标记 <code>origin: "prediction"</code>；接入后须先人工审核，再保存为正式标注。完整约定见仓库 docs/MODEL_API.md。</p></div></div></>}
+      {page === 'models' && <><PageHeading eyebrow="AI PRELABELING" title="模型服务管理" description="按数据类型配置多个模型，在标注页选择并运行。模型输出先进入待审核层。" /><ModelSettings profiles={modelProfiles} selected={selectedModels} onProfilesChange={setModelProfiles} onSelectionChange={setSelectedModels} /></>}
       </div>}
     </div>{toast && <div className="toast"><CheckCircle2 size={17} />{toast}<button onClick={() => setToast('')}><X size={14} /></button></div>}
   </div>;

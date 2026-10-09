@@ -2,6 +2,8 @@
 
 本仓库保持一份 React/Three.js 源码，始终从同一次构建产出 Windows 和 macOS 两个交付包。请在自己的分支修改代码，通过 Pull Request 合并，避免维护功能不同步的两个代码副本。
 
+当前 900 张道路设施图片的复核入口与七类 YOLO 规则见 [道路设施复核说明](docs/ROAD_FURNITURE_REVIEW.md)。不要把 `label/data` 的真实 JPG、TXT、JSON 或 PPTX 复制进仓库或交付 ZIP；复核结果用工作台导出的 YOLO ZIP 交接。
+
 ## 开发与交付
 
 1. 安装 Node.js 20+ 和 Python 3。
@@ -20,4 +22,4 @@
 - 用仓库内的合成演示样本检查左右视图、框内点数、选区建框和全景投影；真实尖沙咀数据仅在获得授权后另行分享。
 - 不要提交原始多 GB 点云、设备私有路径、密钥或由外部项目复制来的源码。
 
-模型同事先读 [预标注服务接口](docs/MODEL_API.md)，界面同事先读 [UI 设计说明](docs/UI_DESIGN.md)。新增模型输出不要直接覆盖人工标注；预测结果需要审核步骤。
+模型同事先读 [预标注服务接口](docs/MODEL_API.md)与[模型切换说明](docs/MODEL_SWITCHING.md)，界面同事先读 [UI 设计说明](docs/UI_DESIGN.md)。新增模型输出不要直接覆盖人工标注；预测结果需要审核步骤。可用 `node examples/mock-model-server.mjs` 验证两个图片模型和一个点云／全景模型的切换。

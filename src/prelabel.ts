@@ -1,10 +1,10 @@
 import type { PredictionRequest, PredictionResponse } from './types';
 
-/** An adapter boundary only. The workbench does not call a model yet. */
+/** Interchangeable paired point-cloud/panorama model adapter. */
 export interface PrelabelProvider {
   id: string;
   label: string;
-  predict(request: PredictionRequest): Promise<PredictionResponse>;
+  predict(request: PredictionRequest, signal?: AbortSignal): Promise<PredictionResponse>;
 }
 
 const PREDICT_TIMEOUT_MS = 120_000;
@@ -17,13 +17,17 @@ function serviceUrl(endpoint: string, path: string): string {
   return `${parsed.href.replace(/\/+$/, '')}/${path}`;
 }
 
-async function requestWithTimeout(url: string, init: RequestInit, timeoutMs: number): Promise<Response> {
+export async function requestWithTimeout(url: string, init: RequestInit, timeoutMs: number, signal?: AbortSignal): Promise<Response> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
+  const abort = () => controller.abort();
+  signal?.addEventListener('abort', abort, { once: true });
   try {
+    if (signal?.aborted) controller.abort();
     return await fetch(url, { ...init, signal: controller.signal });
   } finally {
     clearTimeout(timer);
+    signal?.removeEventListener('abort', abort);
   }
 }
 
@@ -32,11 +36,12 @@ export async function uploadPrelabelAsset(
   endpoint: string,
   file: File,
   kind: 'pointCloud' | 'panorama',
+  signal?: AbortSignal,
 ): Promise<string> {
   const body = new FormData();
   body.set('kind', kind);
   body.set('file', file);
-  const response = await requestWithTimeout(serviceUrl(endpoint, 'assets'), { method: 'POST', body }, UPLOAD_TIMEOUT_MS);
+  const response = await requestWithTimeout(serviceUrl(endpoint, 'assets'), { method: 'POST', body }, UPLOAD_TIMEOUT_MS, signal);
   if (!response.ok) throw new Error(`资产上传失败：HTTP ${response.status}`);
   const payload = await response.json() as { assetId?: unknown };
   if (typeof payload.assetId !== 'string' || !payload.assetId) throw new Error('资产上传响应缺少 assetId');
@@ -47,7 +52,7 @@ export function createHttpPrelabelProvider(endpoint: string): PrelabelProvider {
   return {
     id: 'http',
     label: endpoint,
-    async predict(request) {
+    async predict(request, signal) {
       if (request.schemaVersion !== '0.2' || !request.pointCloudAssetId || !request.panoramaAssetId) {
         throw new Error('预标注请求缺少协议版本或已上传的资产 ID');
       }
@@ -55,7 +60,7 @@ export function createHttpPrelabelProvider(endpoint: string): PrelabelProvider {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(request),
-      }, PREDICT_TIMEOUT_MS);
+      }, PREDICT_TIMEOUT_MS, signal);
       if (!response.ok) throw new Error(`预标注接口返回 HTTP ${response.status}`);
       const payload = await response.json() as Partial<PredictionResponse>;
       if (payload.schemaVersion !== '0.2' || !Array.isArray(payload.annotations) ||

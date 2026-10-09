@@ -7,3 +7,4 @@ release/
 public/sample-cloud.pcd
 public/sample-panorama.jpg
 public/sample-metadata.json
+.atlas-local-data.json

@@ -1,7 +1,7 @@
 export type Vec3 = [number, number, number];
 export type UV = [number, number];
 export type ToolMode = 'navigate' | 'cuboid' | 'cloud-paint' | 'pano-point' | 'pano-polygon';
-export type Page = 'workspace' | 'tasks' | 'sources' | 'ontology' | 'registration' | 'models';
+export type Page = 'review' | 'workspace' | 'tasks' | 'sources' | 'ontology' | 'registration' | 'models';
 
 export interface ClassDefinition {
   id: string;
@@ -29,6 +29,8 @@ export interface Annotation {
   visible: boolean;
   origin: 'manual' | 'prediction';
   confidence?: number; // optional model score in [0, 1]; not shown for manual annotations
+  modelId?: string;
+  modelVersion?: string;
   pointCloud?: Cuboid;
   panorama?:
     | { kind: 'point'; uv: UV }
