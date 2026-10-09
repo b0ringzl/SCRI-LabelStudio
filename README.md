@@ -6,7 +6,7 @@
 
 本次任务以 `label/data` 中的文件为准。`data_for_annotation` 有 900 张普通 JPG 与同名 YOLO 标签，类别是 `sign`、`sign_s`、`fence`、`sign_p`、`fence_v`、`sign_d`、`pole`。启动后默认进入“道路设施复核”：可增删、移动、调整 2D 框，修正类别，筛选疑似重复框，逐张确认并导出 YOLO ZIP。具体定义和一致性规则见 [道路设施复核说明](docs/ROAD_FURNITURE_REVIEW.md)。这批目录没有点云文件；原有点云/全景联合工作台仍保留在导航中。
 
-真实道路设施图片、标签和 PPTX 只在本机读取，不提交仓库，也不进入 Windows/macOS 交付包。其他电脑运行时，在复核页选择 `data_for_annotation` 文件夹即可。当前默认复核的是文件中已有的预测结果；如另行配置兼容服务，可对当前图片重新运行模型并审核候选。
+真实道路设施图片、标签和 PPTX 只在本机读取，不提交仓库，也不进入 Windows/macOS 交付包。其他电脑运行时，在复核页选择 `data_for_annotation` 文件夹即可。当前默认复核的是文件中已有的预测结果；如另行配置兼容服务，可对当前图片重新运行模型并审核候选。现在也可通过本机代理接入千问或 DeepSeek 视觉模型；配置和双平台启动命令见 [LLM 接入说明](docs/LLM_PROVIDERS.md)。
 
 ## 本地打开
 

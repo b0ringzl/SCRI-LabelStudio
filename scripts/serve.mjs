@@ -4,6 +4,7 @@ import { createServer } from 'node:http';
 import { basename, dirname, extname, isAbsolute, join, relative, resolve } from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { handleLlmPredict } from './llmGateway.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..', 'dist');
 const projectRoot = resolve(root, '..');
@@ -96,11 +97,6 @@ try {
 }
 
 async function serveFile(request, response) {
-  if (request.method !== 'GET' && request.method !== 'HEAD') {
-    response.writeHead(405, { Allow: 'GET, HEAD' });
-    response.end();
-    return;
-  }
   let pathname;
   try {
     pathname = decodeURIComponent(new URL(request.url ?? '/', `http://${host}`).pathname);
@@ -116,6 +112,15 @@ async function serveFile(request, response) {
   }
   if (pathname === '/api/review-manifest') {
     await serveReviewManifest(request, response);
+    return;
+  }
+  if (pathname === '/api/llm/predict') {
+    await handleLlmPredict(request, response);
+    return;
+  }
+  if (request.method !== 'GET' && request.method !== 'HEAD') {
+    response.writeHead(405, { Allow: 'GET, HEAD' });
+    response.end();
     return;
   }
   if (pathname.startsWith('/api/review-image/')) {

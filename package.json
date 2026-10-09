@@ -1,14 +1,15 @@
 {
   "name": "atlas-annotation-studio",
   "private": true,
-  "version": "0.6.0",
+  "version": "0.7.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.node.json && vite build",
     "preview": "vite preview",
     "serve": "node scripts/serve.mjs",
-    "package": "node scripts/run_packager.mjs"
+    "package": "node scripts/run_packager.mjs",
+    "test:llm": "node scripts/test_llm_gateway.mjs"
   },
   "dependencies": {
     "fflate": "^0.8.3",

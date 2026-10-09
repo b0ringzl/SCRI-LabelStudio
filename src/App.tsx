@@ -14,7 +14,7 @@ import { demoTask, syntheticDemoTask, initialAnnotations, initialClasses, initia
 import ImageReview from './ImageReview';
 import ModelSettings from './ModelSettings';
 import PairModelBar from './PairModelBar';
-import { validatePairPrediction } from './modelApi';
+import { runVisionLlm, validatePairPrediction } from './modelApi';
 import { loadModelProfiles, loadModelSelection } from './modelRegistry';
 import type { ModelModality, ModelProfile } from './modelRegistry';
 import { createHttpPrelabelProvider, uploadPrelabelAsset } from './prelabel';
@@ -234,6 +234,25 @@ export default function App() {
     setPairRunning(true);
     flash(`正在调用 ${selectedPairModel.name}…`);
     try {
+      if (selectedPairModel.adapter === 'qwen-vl-v1' || selectedPairModel.adapter === 'deepseek-vision-v1') {
+        const panoramaResponse = await fetch(task.panoramaUrl, { signal: controller.signal });
+        if (!panoramaResponse.ok) throw new Error('当前全景影像无法读取');
+        const output = await runVisionLlm(selectedPairModel, await panoramaResponse.blob(), classes, 'panorama', controller.signal);
+        if (controller.signal.aborted) return;
+        setPairCandidates(output.boxes.map((box) => {
+          const left = box.x - box.w / 2, right = box.x + box.w / 2;
+          const top = box.y - box.h / 2, bottom = box.y + box.h / 2;
+          return { id: `candidate:${crypto.randomUUID()}`, classId: box.classId,
+            name: classes.find((entry) => entry.id === box.classId)?.name ?? box.classId,
+            visible: true, origin: 'prediction' as const, modelId: selectedPairModel.id,
+            modelVersion: output.modelVersion,
+            panorama: { kind: 'polygon' as const, vertices: [[left, top], [right, top], [right, bottom], [left, bottom]] as [number, number][] } };
+        }));
+        setPairPointCandidates([]);
+        setPairModelVersion(output.modelVersion ?? selectedPairModel.name);
+        flash(`收到 ${output.boxes.length} 个全景区域候选；请在影像中审核。LLM 不生成点云 3D 框。`);
+        return;
+      }
       const [cloudResponse, panoramaResponse] = await Promise.all([
         fetch(task.pointCloudUrl, { signal: controller.signal }),
         fetch(task.panoramaUrl, { signal: controller.signal }),

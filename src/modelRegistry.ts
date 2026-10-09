@@ -1,5 +1,5 @@
 export type ModelModality = 'image2d' | 'paired3d';
-export type ModelAdapterId = 'atlas-image-v1' | 'atlas-paired-v0.2';
+export type ModelAdapterId = 'atlas-image-v1' | 'atlas-paired-v0.2' | 'qwen-vl-v1' | 'deepseek-vision-v1';
 
 export interface ModelProfile {
   id: string;
@@ -7,6 +7,7 @@ export interface ModelProfile {
   modality: ModelModality;
   adapter: ModelAdapterId;
   endpoint: string;
+  modelName?: string;
 }
 
 export const MODEL_STORAGE_KEY = 'atlas-model-profiles-v1';
@@ -14,6 +15,10 @@ export const MODEL_SELECTION_KEY = 'atlas-selected-models-v1';
 
 export function adapterFor(modality: ModelModality): ModelAdapterId {
   return modality === 'image2d' ? 'atlas-image-v1' : 'atlas-paired-v0.2';
+}
+
+export function supportsAdapter(modality: ModelModality, adapter: ModelAdapterId): boolean {
+  return adapter === adapterFor(modality) || adapter === 'qwen-vl-v1' || adapter === 'deepseek-vision-v1';
 }
 
 export function normalizeEndpoint(value: string): string {
@@ -39,7 +44,8 @@ export function loadModelProfiles(): ModelProfile[] {
       return typeof profile.id === 'string' && typeof profile.name === 'string' &&
         typeof profile.endpoint === 'string' &&
         (profile.modality === 'image2d' || profile.modality === 'paired3d') &&
-        profile.adapter === adapterFor(profile.modality);
+        typeof profile.adapter === 'string' && supportsAdapter(profile.modality, profile.adapter) &&
+        (!['qwen-vl-v1', 'deepseek-vision-v1'].includes(profile.adapter) || typeof profile.modelName === 'string');
     });
   } catch { /* Ignore stale settings. */ }
   return [];
