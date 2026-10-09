@@ -8,12 +8,16 @@ import type { Annotation, ClassDefinition, Cuboid, Registration, ToolMode, Vec3 
 
 type ViewMode = 'perspective' | 'top' | 'front';
 type EditMode = 'translate' | 'scale' | 'rotate';
+const EMPTY_PREVIEWS: Annotation[] = [];
+const EMPTY_PREVIEW_LABELS: Record<string, string> = {};
 
 interface Props {
   geometry: THREE.BufferGeometry | null;
   annotations: Annotation[];
+  previewAnnotations?: Annotation[];
   classes: ClassDefinition[];
   semanticLabels: Record<string, string>;
+  previewSemanticLabels?: Record<string, string>;
   selectedId: string | null;
   registration: Registration;
   tool: ToolMode;
@@ -66,7 +70,7 @@ function applyViewPreset(view: SceneState, mode: ViewMode) {
   view.controls.update();
 }
 
-export default function PointCloudView({ geometry, annotations, classes, semanticLabels, selectedId, registration, tool, focusSelected, onToggleFocus, onCreate, onUpdate, onPaint, onUndoPaint, canUndoPaint, onSelect, onEmptySelection }: Props) {
+export default function PointCloudView({ geometry, annotations, previewAnnotations = EMPTY_PREVIEWS, classes, semanticLabels, previewSemanticLabels = EMPTY_PREVIEW_LABELS, selectedId, registration, tool, focusSelected, onToggleFocus, onCreate, onUpdate, onPaint, onUndoPaint, canUndoPaint, onSelect, onEmptySelection }: Props) {
   const host = useRef<HTMLDivElement>(null);
   const state = useRef<SceneState | null>(null);
   const createRef = useRef(onCreate);
@@ -430,10 +434,11 @@ export default function PointCloudView({ geometry, annotations, classes, semanti
     const view = state.current;
     if (!view) return;
     disposeOverlays(view.overlays);
-    for (const annotation of annotations) {
+    for (const annotation of [...annotations, ...previewAnnotations]) {
       if (!annotation.visible || !annotation.pointCloud) continue;
+      const preview = previewAnnotations.includes(annotation);
       const definition = classes.find((item) => item.id === annotation.classId);
-      const color = new THREE.Color(definition?.color ?? '#ffffff');
+      const color = new THREE.Color(preview ? '#c3a4ff' : definition?.color ?? '#ffffff');
       const box = annotation.pointCloud;
       const group = new THREE.Group();
       group.position.set(...box.center);
@@ -441,9 +446,13 @@ export default function PointCloudView({ geometry, annotations, classes, semanti
       const boxGeometry = new THREE.BoxGeometry(...box.size);
       const edges = new THREE.EdgesGeometry(boxGeometry);
       boxGeometry.dispose();
-      const wire = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color, depthTest: false }));
+      const wire = new THREE.LineSegments(edges, preview
+        ? new THREE.LineDashedMaterial({ color, depthTest: false, dashSize: 0.28, gapSize: 0.16 })
+        : new THREE.LineBasicMaterial({ color, depthTest: false }));
+      if (preview) wire.computeLineDistances();
       wire.renderOrder = 3;
       group.add(wire);
+      if (!preview) {
       const pickingMesh = new THREE.Mesh(
         new THREE.BoxGeometry(...box.size),
         new THREE.MeshBasicMaterial({ color, transparent: true, opacity: annotation.id === selectedId ? 0.075 : 0.018, depthWrite: false }),
@@ -451,6 +460,7 @@ export default function PointCloudView({ geometry, annotations, classes, semanti
       pickingMesh.userData.annotationId = annotation.id;
       pickingMesh.renderOrder = 2;
       group.add(pickingMesh);
+      }
       if (annotation.id === selectedId) {
         const dot = new THREE.Mesh(new THREE.SphereGeometry(0.18, 10, 10), new THREE.MeshBasicMaterial({ color }));
         dot.renderOrder = 4;
@@ -461,7 +471,7 @@ export default function PointCloudView({ geometry, annotations, classes, semanti
     const cameraMarker = new THREE.Mesh(new THREE.SphereGeometry(0.28, 12, 12), new THREE.MeshBasicMaterial({ color: '#ffc96c' }));
     cameraMarker.position.set(...registration.position);
     view.overlays.add(cameraMarker);
-  }, [annotations, classes, selectedId, registration]);
+  }, [annotations, previewAnnotations, classes, selectedId, registration]);
 
   useEffect(() => {
     const view = state.current;
@@ -478,12 +488,13 @@ export default function PointCloudView({ geometry, annotations, classes, semanti
     for (let i = 0; i < positions.count; i++) {
       const brightness = box && !pointInCuboid(positions.getX(i), positions.getY(i), positions.getZ(i), box) ? 0.08 : 1;
       const labelColor = labelColors.get(semanticLabels[i]);
-      target[i * 3] = (labelColor?.[0] ?? base[i * 3]) * brightness;
-      target[i * 3 + 1] = (labelColor?.[1] ?? base[i * 3 + 1]) * brightness;
-      target[i * 3 + 2] = (labelColor?.[2] ?? base[i * 3 + 2]) * brightness;
+      const candidateColor = !labelColor && previewSemanticLabels[i] !== undefined ? [0.72, 0.43, 1] : null;
+      target[i * 3] = (labelColor?.[0] ?? candidateColor?.[0] ?? base[i * 3]) * brightness;
+      target[i * 3 + 1] = (labelColor?.[1] ?? candidateColor?.[1] ?? base[i * 3 + 1]) * brightness;
+      target[i * 3 + 2] = (labelColor?.[2] ?? candidateColor?.[2] ?? base[i * 3 + 2]) * brightness;
     }
     colors.needsUpdate = true;
-  }, [geometry, annotations, selectedId, focusSelected, semanticLabels, classes]);
+  }, [geometry, annotations, selectedId, focusSelected, semanticLabels, previewSemanticLabels, classes]);
 
   return <div className={`viewer-canvas point-view ${tool === 'cuboid' || tool === 'cloud-paint' ? 'crosshair' : ''}`} aria-label="三维点云视图">
     <div ref={host} className="point-canvas-host" />

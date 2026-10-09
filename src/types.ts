@@ -29,6 +29,8 @@ export interface Annotation {
   visible: boolean;
   origin: 'manual' | 'prediction';
   confidence?: number; // optional model score in [0, 1]; not shown for manual annotations
+  modelId?: string;
+  modelVersion?: string;
   pointCloud?: Cuboid;
   panorama?:
     | { kind: 'point'; uv: UV }

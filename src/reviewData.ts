@@ -16,6 +16,9 @@ export interface ReviewBox {
   w: number;
   h: number;
   origin: 'prediction' | 'manual';
+  confidence?: number;
+  modelId?: string;
+  modelVersion?: string;
 }
 
 export interface ReviewTask {

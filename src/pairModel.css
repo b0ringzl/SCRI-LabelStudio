@@ -1,0 +1,15 @@
+.pair-model-panel { border:1px solid #dedaf2; border-top:0; background:#faf9ff; color:#6558ba; }
+.pair-model-toolbar { min-height:42px; display:flex; align-items:center; gap:8px; padding:6px 10px; flex-wrap:wrap; font-size:11px; }
+.pair-model-toolbar select { min-width:160px; max-width:230px; border:1px solid #d7d2ee; border-radius:5px; padding:5px; background:white; color:#42516a; font-size:11px; }
+.pair-model-toolbar button,.pair-model-candidate button,.pair-model-batch button,.pair-model-points button { border:1px solid #cfc7ef; border-radius:5px; background:white; color:#6658bc; font-size:10px; font-weight:700; padding:5px 8px; white-space:nowrap; }
+.pair-model-toolbar button:not(.pair-model-settings),.pair-model-batch button:first-child { background:#6c60d6; color:white; }
+.pair-model-toolbar button:disabled { opacity:.45; }
+.pair-model-toolbar small { margin-left:auto; color:#9c96b1; }
+.pair-model-candidates { border-top:1px solid #e7e3f5; padding:7px 11px; }
+.pair-model-candidate-head { display:flex; justify-content:space-between; gap:8px; font-size:11px; }
+.pair-model-candidate-head span { color:#9a92b3; font-size:10px; }
+.pair-model-list { max-height:115px; overflow:auto; margin-top:5px; }
+.pair-model-candidate { display:flex; align-items:center; gap:6px; padding:4px 0; border-top:1px solid #ede9f9; font-size:10px; }
+.pair-model-candidate span { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:#49556d; }
+.pair-model-batch,.pair-model-points { display:flex; gap:7px; align-items:center; padding-top:7px; font-size:10px; }
+.pair-model-points span { margin-right:auto; }

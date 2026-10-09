@@ -46,4 +46,4 @@ YOLO 第一列必须使用以下固定编号，顺序与 `data_for_annotation/cl
 - `src/ImageReview.tsx`：任务队列、框编辑、审核状态、YOLO 导出。
 - `src/reviewData.ts`：固定类别、YOLO 读写、疑似重复计算。
 - `scripts/serve.mjs`：可选的本地目录只读接口 `/api/review-manifest` 和 `/api/review-image/{name}`。
-- [模型接口说明](MODEL_API.md)：当前读取现有 YOLO 预标注，尚未调用推理模型。模型同事需保证输出类别编号与归一化框格式一致。
+- [模型接口说明](MODEL_API.md)：默认读取现有 YOLO 预标注；配置兼容的 `atlas-image-v1` 服务后，也可对当前图片运行新预测并审核候选。模型同事需保证输出类别编号与归一化框格式一致。配置与切换操作见[模型切换说明](MODEL_SWITCHING.md)。

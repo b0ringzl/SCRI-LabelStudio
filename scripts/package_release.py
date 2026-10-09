@@ -38,11 +38,14 @@ def package(platform: str, launcher: str, readme: str) -> Path:
                     continue
                 add_file(archive, source, f"{folder}/dist/{source.relative_to(DIST).as_posix()}")
         add_file(archive, ROOT / "scripts" / "serve.mjs", f"{folder}/scripts/serve.mjs")
+        add_file(archive, ROOT / "examples" / "mock-model-server.mjs", f"{folder}/examples/mock-model-server.mjs")
         add_file(archive, ROOT / launcher, f"{folder}/{launcher}", executable=launcher.endswith(".command"))
         add_file(archive, ROOT / "docs" / readme, f"{folder}/README.md")
         add_file(archive, ROOT / "docs" / "ROAD_FURNITURE_REVIEW.md", f"{folder}/docs/ROAD_FURNITURE_REVIEW.md")
         add_file(archive, ROOT / "docs" / "MODEL_API.md", f"{folder}/docs/MODEL_API.md")
+        add_file(archive, ROOT / "docs" / "MODEL_SWITCHING.md", f"{folder}/docs/MODEL_SWITCHING.md")
         add_file(archive, ROOT / "docs" / "UI_DESIGN.md", f"{folder}/docs/UI_DESIGN.md")
+        add_file(archive, ROOT / "docs" / "UI_ARCHITECTURE.md", f"{folder}/docs/UI_ARCHITECTURE.md")
     with zipfile.ZipFile(target) as archive:
         if archive.testzip() is not None:
             raise RuntimeError(f"Corrupt archive: {target}")

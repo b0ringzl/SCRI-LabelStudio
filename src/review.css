@@ -11,6 +11,23 @@
 .review-summary strong { font-size: 17px; color: #2d3850; margin-right: 4px; }
 .review-summary .warning strong { color: #c67a27; }
 .review-source { margin-left: auto; font-weight: 700; color: #6f64d6; }
+.review-model-bar { display:flex; align-items:center; gap:9px; flex-wrap:wrap; border:1px solid #e5e2f5; border-radius:10px; padding:9px 12px; background:#f8f7ff; color:#6f62c7; font-size:11px; }
+.review-model-bar label { display:flex; align-items:center; gap:7px; font-weight:700; }
+.review-model-bar select { max-width:230px; min-width:150px; border:1px solid #dcd8f0; border-radius:6px; padding:6px 8px; background:white; color:#394660; font-size:11px; }
+.review-model-bar button { border:1px solid #cdc6ef; border-radius:6px; padding:6px 9px; background:#6b60d3; color:white; font-size:11px; font-weight:700; }
+.review-model-bar button:disabled { opacity:.45; }
+.review-model-bar .review-model-settings { background:white; color:#665abb; }
+.review-model-bar > span { margin-left:auto; color:#9a95b2; }
+.review-candidate-shape { pointer-events:none; }
+.review-candidate-shape rect { fill:#a79aff22; stroke-width:2.5px; stroke-dasharray:9 5; vector-effect:non-scaling-stroke; }
+.review-candidates { margin:12px; padding:11px; border:1px solid #d6cff8; border-radius:9px; background:#faf9ff; }
+.review-candidates > div:first-child { display:flex; justify-content:space-between; gap:7px; color:#5f55ad; font-size:11px; }
+.review-candidates small { color:#938ab7; }
+.review-candidate-row { display:flex; align-items:center; gap:5px; padding:6px 0; border-bottom:1px solid #eae6fa; font-size:11px; }
+.review-candidate-row span { flex:1; color:#46536a; }
+.review-candidate-row button,.review-candidate-actions button { border:1px solid #d8d2f1; border-radius:5px; background:white; color:#6659bf; font-size:10px; padding:4px 6px; }
+.review-candidate-actions { display:flex; gap:6px; margin-top:9px; }
+.review-candidate-actions button:first-child { background:#6b60d3; color:white; }
 .review-import { max-width: 660px; margin: 40px auto; padding: 40px; text-align: center; border: 1px dashed #c8cfe0; border-radius: 16px; background: white; }
 .review-import > svg { color: #7d70da; }
 .review-import h2 { margin: 10px 0; font-size: 21px; }

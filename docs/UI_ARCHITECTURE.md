@@ -72,9 +72,9 @@ Atlas Studio
 - 从全景点反推三维时只有一条射线，缺少深度；当前仅提示附近点云候选点，不自动建立几何对应。跨视图标注归属由人工选择共享对象 ID。
 - 可共享合成样本和本机可选的尖沙咀样本均以相机局部系显示；普通导入数据需提供正确的相机位姿。真实数据的 INS 粗配准可能因杆臂、安装角和时间偏差而产生投影误差。
 
-## 未来服务接口
+## 模型服务接口
 
-`src/prelabel.ts` 定义 `PrelabelProvider.predict(request)`；HTTP 适配器约定先 `POST {endpoint}/assets` 上传双模态文件，再 `POST {endpoint}/predict`。详细协议见 [模型接口契约](MODEL_API.md)。
+`src/prelabel.ts` 定义 `PrelabelProvider.predict(request)`；HTTP 适配器先 `POST {endpoint}/assets` 上传双模态文件，再 `POST {endpoint}/predict`。工作台已接入模型选择与人工审核；普通图片使用单独的 `atlas-image-v1` 适配器。详细协议见 [模型接口契约](MODEL_API.md)及[切换说明](MODEL_SWITCHING.md)。
 
 | 字段 | 说明 |
 | --- | --- |
@@ -87,4 +87,4 @@ Atlas Studio
 | 返回 `modelVersion` | 可选模型版本 |
 | 返回 `semanticPointLabels[]` | 可选逐点类别和置信度 |
 
-建议下一阶段增加后端资产库与任务库，再接入模型推理。这样前端可以按同一对象 ID 显示模型预标注、人工修订和来源信息；真实的自动 2D/3D 对应需要标定外参或额外配准求解。
+下一阶段建议增加后端资产库、任务库及异步作业队列，接入真实模型。前端已按同一对象 ID 展示接受的模型预标注及来源信息；真实的自动 2D/3D 对应仍需要标定外参或额外配准求解。

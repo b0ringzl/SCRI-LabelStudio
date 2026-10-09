@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { strFromU8, strToU8, unzipSync, zipSync } from 'fflate';
 import { ArrowDownToLine, ArrowLeft, ArrowRight, Check, ChevronRight, CircleHelp,
-  FileUp, FolderOpen, RotateCcw, Search, Trash2, TriangleAlert, ZoomIn, ZoomOut } from 'lucide-react';
+  FileUp, FolderOpen, RotateCcw, Search, Sparkles, Trash2, TriangleAlert, ZoomIn, ZoomOut } from 'lucide-react';
 import { ROAD_CLASSES, duplicatePairs, parseYolo, serializeYolo, validateClassOrder } from './reviewData';
 import type { ReviewBox, ReviewManifest, ReviewTask } from './reviewData';
+import { runImageModel } from './modelApi';
+import type { ModelProfile } from './modelRegistry';
 import './review.css';
 
 type SourceItem = { name: string; imageUrl?: string; file?: File; labelText: string };
@@ -48,7 +50,14 @@ function dragBox(drag: Drag, x: number, y: number): ReviewBox {
   return { ...source, x: (left + right) / 2, y: (top + bottom) / 2, w: right - left, h: bottom - top };
 }
 
-export default function ImageReview() {
+interface Props {
+  models: ModelProfile[];
+  selectedModelId: string;
+  onSelectModel: (id: string) => void;
+  onOpenSettings: () => void;
+}
+
+export default function ImageReview({ models, selectedModelId, onSelectModel, onOpenSettings }: Props) {
   const [datasetId, setDatasetId] = useState('');
   const [items, setItems] = useState<ReviewTask[]>([]);
   const itemsRef = useRef<ReviewTask[]>([]);
@@ -72,8 +81,15 @@ export default function ImageReview() {
   const [search, setSearch] = useState('');
   const [message, setMessage] = useState('');
   const [invalidCount, setInvalidCount] = useState(0);
+  const [candidates, setCandidates] = useState<ReviewBox[]>([]);
+  const [candidateVersion, setCandidateVersion] = useState('');
+  const [runningModel, setRunningModel] = useState(false);
+  const modelAbort = useRef<AbortController | null>(null);
 
   function loadDataset(id: string, classes: string[], sources: SourceItem[]) {
+    modelAbort.current?.abort();
+    setCandidates([]);
+    setCandidateVersion('');
     if (!validateClassOrder(classes)) {
       setMessage(`类别顺序与项目要求不一致。需要：${ROAD_CLASSES.map((entry) => entry.id).join(', ')}`);
       return;
@@ -114,9 +130,20 @@ export default function ImageReview() {
   }, []);
 
   const active = items.find((item) => item.name === activeName);
+  const selectedModel = models.find((model) => model.id === selectedModelId && model.modality === 'image2d');
   const selected = active?.boxes.find((box) => box.id === selectedId) ?? null;
   const duplicates = active ? duplicatePairs(active.boxes) : [];
   const duplicateIds = new Set(duplicates.flat());
+
+  useEffect(() => {
+    modelAbort.current?.abort();
+    modelAbort.current = null;
+    setRunningModel(false);
+    setCandidates([]);
+    setCandidateVersion('');
+  }, [activeName, datasetId, selectedModelId]);
+
+  useEffect(() => () => modelAbort.current?.abort(), []);
 
   useEffect(() => {
     if (!active) { setImageUrl(''); return; }
@@ -215,6 +242,46 @@ export default function ImageReview() {
     setSelectedId(null);
   }
 
+  async function runModel() {
+    if (!active || !selectedModel || runningModel) return;
+    const controller = new AbortController();
+    modelAbort.current = controller;
+    setRunningModel(true);
+    setMessage(`正在调用 ${selectedModel.name}…`);
+    try {
+      let image: Blob;
+      if (active.file) image = active.file;
+      else {
+        const response = await fetch(active.imageUrl ?? '', { signal: controller.signal });
+        if (!response.ok) throw new Error(`读取图片失败：HTTP ${response.status}`);
+        image = await response.blob();
+      }
+      const prediction = await runImageModel(selectedModel, active.name, image, active.name, controller.signal);
+      if (controller.signal.aborted) return;
+      setCandidates(prediction.boxes.map((box) => ({ ...box, id: `candidate:${crypto.randomUUID()}`,
+        origin: 'prediction', modelId: selectedModel.id, modelVersion: prediction.modelVersion })));
+      setCandidateVersion(prediction.modelVersion ?? selectedModel.name);
+      setMessage(`收到 ${prediction.boxes.length} 个候选框。逐个接受或全部接受后才进入正式标注。`);
+    } catch (error) {
+      if (!controller.signal.aborted) setMessage(`模型运行失败：${error instanceof Error ? error.message : '未知错误'}`);
+    } finally {
+      if (modelAbort.current === controller) { modelAbort.current = null; setRunningModel(false); }
+    }
+  }
+
+  function acceptCandidate(id: string) {
+    const candidate = candidates.find((box) => box.id === id);
+    if (!candidate || !active) return;
+    mutateBoxes([...active.boxes, candidate]);
+    setCandidates((previous) => previous.filter((box) => box.id !== id));
+  }
+
+  function acceptAllCandidates() {
+    if (!active || !candidates.length) return;
+    mutateBoxes([...active.boxes, ...candidates]);
+    setCandidates([]);
+  }
+
   function pointerDown(event: React.PointerEvent<SVGSVGElement>) {
     if (!active || event.button !== 0) return;
     const { x, y } = point(event);
@@ -305,7 +372,8 @@ export default function ImageReview() {
       'review_manifest.json': strToU8(JSON.stringify({ datasetId, schemaVersion: 1,
         reviewed: Object.fromEntries(items.map((item) => [item.name, item.reviewed])),
         boxMeta: Object.fromEntries(items.map((item) => [item.name,
-          item.boxes.map(({ id, origin }) => ({ id, origin }))])) }, null, 2)),
+          item.boxes.map(({ id, origin, confidence, modelId, modelVersion }) =>
+            ({ id, origin, confidence, modelId, modelVersion }))])) }, null, 2)),
     };
     items.forEach((item) => { files[`labels/${stem(item.name)}.txt`] = strToU8(serializeYolo(item.boxes)); });
     const zipped = zipSync(files, { level: 6 });
@@ -328,7 +396,8 @@ export default function ImageReview() {
       const manifest = entries['review_manifest.json']
         ? JSON.parse(strFromU8(entries['review_manifest.json'])) as {
           datasetId?: string; reviewed?: Record<string, boolean>;
-          boxMeta?: Record<string, Array<{ id: string; origin: 'prediction' | 'manual' }>>;
+          boxMeta?: Record<string, Array<{ id: string; origin: 'prediction' | 'manual';
+            confidence?: number; modelId?: string; modelVersion?: string }>>;
         } : {};
       if (manifest.datasetId && manifest.datasetId !== datasetId) throw new Error('ZIP 属于另一个数据集');
       const found = itemsRef.current.filter((item) => entries[`labels/${stem(item.name)}.txt`]).length;
@@ -340,7 +409,8 @@ export default function ImageReview() {
         const boxes = parsed.boxes.map((box, index) => {
           const entry = meta?.[index];
           return entry && typeof entry.id === 'string' && ['prediction', 'manual'].includes(entry.origin)
-            ? { ...box, id: entry.id, origin: entry.origin } : box;
+            ? { ...box, id: entry.id, origin: entry.origin,
+              confidence: entry.confidence, modelId: entry.modelId, modelVersion: entry.modelVersion } : box;
         });
         return { ...item, boxes, reviewed: Boolean(manifest.reviewed?.[item.name]) };
       });
@@ -364,13 +434,15 @@ export default function ImageReview() {
   return <div className="road-review">
     <div className="review-title"><div><span className="eyebrow">ROAD FURNITURE · YOLO REVIEW</span><h1>道路设施预标注复核</h1><p>依据本次 900 张图片与七类标注规范，逐张修正重复、错误和遗漏的 2D 框。</p></div><div className="review-title-actions"><input ref={progressInput} type="file" accept=".zip,application/zip" hidden onChange={(event) => void importProgress(event.target.files?.[0])} /><button className="review-import-progress" disabled={!items.length} onClick={() => progressInput.current?.click()} title="导入 ZIP 并覆盖当前本地复核状态"><FileUp size={17} />导入进度 ZIP</button><button className="review-export" disabled={!items.length} onClick={exportYolo}><ArrowDownToLine size={17} />导出 YOLO ZIP</button></div></div>
     <div className="review-summary"><span><strong>{items.length}</strong> 张图片</span><span><strong>{stats.reviewed}</strong> 已确认</span><span><strong>{stats.boxes}</strong> 个框</span><span className={stats.duplicates ? 'warning' : ''}><strong>{stats.duplicates}</strong> 张疑似重复</span><span className="review-source">{datasetId || '尚未载入数据'}</span></div>
+    <div className="review-model-bar"><Sparkles size={17} /><label>辅助模型<select aria-label="道路设施辅助模型" value={selectedModel?.id ?? ''} onChange={(event) => onSelectModel(event.target.value)}><option value="">选择图片模型</option>{models.filter((model) => model.modality === 'image2d').map((model) => <option key={model.id} value={model.id}>{model.name}</option>)}</select></label><button onClick={() => void runModel()} disabled={!active || !selectedModel || runningModel || candidates.length > 0}>{runningModel ? '运行中…' : '运行当前图片'}</button>{runningModel && <button onClick={() => modelAbort.current?.abort()}>取消</button>}<button className="review-model-settings" onClick={onOpenSettings}>管理模型</button><span>点击运行后才上传当前图片；切换图片或模型会丢弃未审核候选。</span></div>
     {!items.length && <div className="review-import"><FolderOpen size={32} /><h2>载入 data_for_annotation</h2><p>本机启动服务会自动读取已配置的数据目录。其他电脑可选择含 images、labels、class.txt 的文件夹。图片和标签只在当前浏览器中读取。</p><input ref={folderInput} type="file" multiple hidden onChange={(event) => void importFiles(Array.from(event.target.files ?? []))} /><button onClick={() => folderInput.current?.click()}><FolderOpen size={18} />选择数据文件夹</button><div className="review-import-fallback"><label>或分别选取图片<input type="file" accept="image/*" multiple onChange={(event) => setExtraImages(Array.from(event.target.files ?? []))} /></label><label>与 YOLO 标签<input type="file" accept=".txt,text/plain" multiple onChange={(event) => setExtraLabels(Array.from(event.target.files ?? []))} /></label><button disabled={!extraImages.length || !extraLabels.length} onClick={() => void importFiles([...extraImages, ...extraLabels])}>载入所选文件</button></div></div>}
     {items.length > 0 && <div className="review-layout">
       <aside className="review-queue"><div className="review-queue-head"><strong>图片任务</strong><span>{filtered.length} / {items.length}</span></div><div className="review-search"><Search size={15} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="搜索文件名" /></div><div className="review-filters">{([['all', '全部'], ['pending', '待确认'], ['reviewed', '已确认'], ['empty', '空标注'], ['duplicates', '疑似重复']] as [Filter, string][]).map(([value, label]) => <button key={value} className={filter === value ? 'active' : ''} onClick={() => setFilter(value)}>{label}</button>)}</div><div className="review-task-list">{filtered.map((item) => <button key={item.name} className={`review-task ${item.name === activeName ? 'active' : ''}`} onClick={() => selectTask(item.name)}><span className={item.reviewed ? 'review-task-state done' : 'review-task-state'}>{item.reviewed ? <Check size={12} /> : null}</span><span className="review-task-copy"><strong title={item.name}>{item.name}</strong><small>{item.boxes.length} 框{duplicatePairs(item.boxes).length ? ' · 疑似重复' : ''}</small></span><ChevronRight size={15} /></button>)}</div></aside>
       <main className="review-center"><div className="review-image-head"><div><strong>{active?.name}</strong><span>{activeIndex + 1} / {items.length} · {active?.reviewed ? '已确认' : '待复核'}</span></div><div className="review-image-actions"><button onClick={() => setZoom((value) => Math.max(1, value / 1.5))} disabled={zoom <= 1} title="缩小"><ZoomOut size={17} /></button><span>{Math.round(zoom * 100)}%</span><button onClick={() => setZoom((value) => Math.min(6, value * 1.5))} disabled={zoom >= 6} title="放大"><ZoomIn size={17} /></button><button onClick={() => step(-1)} disabled={activeIndex <= 0} title="上一张"><ArrowLeft size={17} /></button><button onClick={() => step(1)} disabled={activeIndex >= items.length - 1} title="下一张"><ArrowRight size={17} /></button><button onClick={undo} disabled={!active || !(undoRef.current[active.name]?.length)} title="撤销 Ctrl+Z"><RotateCcw size={17} /></button></div></div><div ref={canvasRef} className="review-canvas"><div className="review-image-stage" style={{ width: Math.round(fitWidth * zoom) }}><img src={imageUrl} alt={active?.name ?? ''} draggable={false} onLoad={(event) => setImageSize({ width: event.currentTarget.naturalWidth, height: event.currentTarget.naturalHeight })} /><svg viewBox="0 0 1000 1000" preserveAspectRatio="none" onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={pointerUp} onPointerCancel={pointerUp}>
         {shownBoxes.map((box) => { const info = ROAD_CLASSES[box.classId]; const left = (box.x - box.w / 2) * 1000; const top = (box.y - box.h / 2) * 1000; const width = box.w * 1000; const height = box.h * 1000; const isSelected = selectedId === box.id; return <g key={box.id}><rect data-box-id={box.id} className={`review-svg-box ${isSelected ? 'selected' : ''} ${duplicateIds.has(box.id) ? 'duplicate' : ''}`} x={left} y={top} width={width} height={height} stroke={info?.color ?? '#fff'} /><text x={left + 3} y={Math.max(16, top - 4)} fill={info?.color ?? '#fff'}>{info?.id ?? '?'}</text>{isSelected && (['nw', 'ne', 'sw', 'se'] as Handle[]).map((handle) => <rect key={handle} data-box-id={box.id} data-handle={handle} className="review-svg-handle" x={(handle.includes('w') ? left : left + width) - 6} y={(handle.includes('n') ? top : top + height) - 6} width="12" height="12" fill={info?.color ?? '#fff'} />)}</g>; })}
-      </svg></div></div><div className="review-canvas-foot"><span><CircleHelp size={15} />拖空白处新增框；拖框移动；拖四角改大小。Delete 删除，1–7 改类，← → 切图。</span><button className="review-confirm" onClick={markReviewed}><Check size={17} />确认并下一张</button></div></main>
-      <aside className="review-inspector"><div className="review-inspector-head"><strong>标注检查</strong><span>{active?.boxes.length ?? 0} 个框</span></div><div className="review-rule-note"><strong>本批次规则</strong><p>连续围栏尽量用一个框。近处及大型标志分别标；背面也标。杆子只标交通标识牌主杆。</p></div>{duplicates.length > 0 && <div className="review-duplicate-note"><TriangleAlert size={17} /><span>发现 {duplicates.length} 对高重叠框，请人工核对并删除多余框。</span></div>}<div className="review-classes"><strong>类别 · 快捷键 1–7</strong>{ROAD_CLASSES.map((entry, index) => <button key={entry.id} className={selectedClass === index ? 'active' : ''} onClick={() => changeClass(index)} title={entry.hint}><i style={{ background: entry.color }} /><span><b>{entry.id}</b><small>{entry.label}</small></span><kbd>{index + 1}</kbd></button>)}</div><div className="review-box-list"><strong>当前图片的框</strong>{active?.boxes.map((box, index) => <button key={box.id} className={selectedId === box.id ? 'active' : ''} onClick={() => { setSelectedId(box.id); setSelectedClass(box.classId); }}><span style={{ background: ROAD_CLASSES[box.classId]?.color }} /><b>{index + 1}. {ROAD_CLASSES[box.classId]?.id}</b><small>{box.origin === 'prediction' ? '预标注' : '新增'}</small>{duplicateIds.has(box.id) && <TriangleAlert size={14} />}</button>)}{active?.boxes.length === 0 && <p>没有预标注框。请检查是否有漏标，也可以直接确认空图。</p>}</div>{selected && <div className="review-selected"><strong>选中框</strong><span>{ROAD_CLASSES[selected.classId]?.id}</span><small>中心 {selected.x.toFixed(3)}, {selected.y.toFixed(3)} · 尺寸 {selected.w.toFixed(3)} × {selected.h.toFixed(3)}</small><button onClick={deleteSelected}><Trash2 size={15} />删除这个框</button></div>}</aside>
+        {candidates.map((box) => { const info = ROAD_CLASSES[box.classId]; return <g key={box.id} className="review-candidate-shape"><rect x={(box.x - box.w / 2) * 1000} y={(box.y - box.h / 2) * 1000} width={box.w * 1000} height={box.h * 1000} stroke={info?.color ?? '#fff'} /><text x={(box.x - box.w / 2) * 1000 + 3} y={Math.max(16, (box.y - box.h / 2) * 1000 - 4)} fill={info?.color ?? '#fff'}>AI · {info?.id}</text></g>; })}
+      </svg></div></div><div className="review-canvas-foot"><span><CircleHelp size={15} />拖空白处新增框；拖框移动；拖四角改大小。Delete 删除，1–7 改类，← → 切图。</span><button className="review-confirm" disabled={candidates.length > 0} title={candidates.length ? '请先接受或忽略模型候选' : ''} onClick={markReviewed}><Check size={17} />确认并下一张</button></div></main>
+      <aside className="review-inspector"><div className="review-inspector-head"><strong>标注检查</strong><span>{active?.boxes.length ?? 0} 个框</span></div><div className="review-rule-note"><strong>本批次规则</strong><p>连续围栏尽量用一个框。近处及大型标志分别标；背面也标。杆子只标交通标识牌主杆。</p></div>{candidates.length > 0 && <div className="review-candidates"><div><strong>模型候选 · {candidateVersion}</strong><small>{candidates.length} 个未审核</small></div>{candidates.map((box) => <div className="review-candidate-row" key={box.id}><span>{ROAD_CLASSES[box.classId]?.id} {box.confidence === undefined ? '' : `${Math.round(box.confidence * 100)}%`}</span><button onClick={() => acceptCandidate(box.id)}>接受</button><button onClick={() => setCandidates((previous) => previous.filter((item) => item.id !== box.id))}>忽略</button></div>)}<div className="review-candidate-actions"><button onClick={acceptAllCandidates}>全部接受</button><button onClick={() => setCandidates([])}>全部忽略</button></div></div>}{duplicates.length > 0 && <div className="review-duplicate-note"><TriangleAlert size={17} /><span>发现 {duplicates.length} 对高重叠框，请人工核对并删除多余框。</span></div>}<div className="review-classes"><strong>类别 · 快捷键 1–7</strong>{ROAD_CLASSES.map((entry, index) => <button key={entry.id} className={selectedClass === index ? 'active' : ''} onClick={() => changeClass(index)} title={entry.hint}><i style={{ background: entry.color }} /><span><b>{entry.id}</b><small>{entry.label}</small></span><kbd>{index + 1}</kbd></button>)}</div><div className="review-box-list"><strong>当前图片的框</strong>{active?.boxes.map((box, index) => <button key={box.id} className={selectedId === box.id ? 'active' : ''} onClick={() => { setSelectedId(box.id); setSelectedClass(box.classId); }}><span style={{ background: ROAD_CLASSES[box.classId]?.color }} /><b>{index + 1}. {ROAD_CLASSES[box.classId]?.id}</b><small>{box.origin === 'prediction' ? '预标注' : '新增'}</small>{duplicateIds.has(box.id) && <TriangleAlert size={14} />}</button>)}{active?.boxes.length === 0 && <p>没有预标注框。请检查是否有漏标，也可以直接确认空图。</p>}</div>{selected && <div className="review-selected"><strong>选中框</strong><span>{ROAD_CLASSES[selected.classId]?.id}</span><small>中心 {selected.x.toFixed(3)}, {selected.y.toFixed(3)} · 尺寸 {selected.w.toFixed(3)} × {selected.h.toFixed(3)}</small><button onClick={deleteSelected}><Trash2 size={15} />删除这个框</button></div>}</aside>
     </div>}
     {message && <div className={`review-message ${invalidCount ? 'warn' : ''}`}><FileUp size={16} />{message}<button onClick={() => setMessage('')}>×</button></div>}
   </div>;
