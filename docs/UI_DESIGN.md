@@ -50,9 +50,11 @@ flowchart LR
 
 “预标注接口”页管理多个服务配置；图片复核页与点云／全景工作台各自只显示匹配的数据类型模型。运行前不上传文件。`src/modelRegistry.ts` 定义配置，`src/modelApi.ts` 和 `src/prelabel.ts` 定义协议与校验。预测结果显示为紫色待审核候选，`origin: "prediction"`，只有用户接受后才写入正式标注；逐点类别只填充尚未标注的点。切换任务或模型会丢弃未审核候选。详见[模型切换与审核](MODEL_SWITCHING.md)与[接口说明](MODEL_API.md)。
 
+配置表单新增“适配方式”：标准 HTTP、千问视觉、DeepSeek 视觉。视觉 LLM 配置只记录模型名称，Key 与上游地址由本机启动环境提供；标注页仍沿用同一模型选择框和紫色候选审核。图片任务得到 2D 框；配对任务只在右侧全景生成 2D 区域，不在左侧点云伪造 3D 框。启动变量及接口见 [LLM 接入说明](LLM_PROVIDERS.md)。
+
 ## 给下一位开发者的起点
 
-1. `npm ci`、`npm run dev`，使用终端显示的本地地址；默认只监听 `127.0.0.1`，遇到端口占用自动改用空闲端口。
+1. `npm ci`、`npm run dev` 可开发界面；使用视觉 LLM 代理时运行 `npm run build`、`npm run serve` 或双平台启动脚本，并按 [LLM 接入说明](LLM_PROVIDERS.md)设置环境变量。默认只监听 `127.0.0.1`，遇到端口占用自动改用空闲端口。
 2. 先读 `src/types.ts`、`src/App.tsx`，再按修改区域查看两个视图组件及 `src/geometry.ts`、`src/boxFitting.ts`。
 3. 修改数据契约时同步更新 [模型接口](MODEL_API.md)、[简化标注流程](labeling-workflow.md) 和导出版本；旧 `localStorage` 数据要有默认值。
 4. `npm run build` 检查类型，`npm run package` 生成 Windows 和 macOS 两份同版本 ZIP；在 PR 中写明两侧视图、框编辑、涂抹及配准是否检查。

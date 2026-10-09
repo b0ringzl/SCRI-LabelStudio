@@ -14,7 +14,7 @@ Atlas Studio
 ├─ 数据源：导入点云、全景、可选相机位姿
 ├─ 标签体系：共享类别表
 ├─ 配准校验：叠加投影、微调相机位姿
-└─ 预标注接口：服务地址与请求 / 响应契约
+└─ 预标注接口：数据类型、模型适配方式与服务配置
 ```
 
 整体沿用 Label Studio 式“项目导航 → 任务 → 标注工作台 → 结果”的信息架构。这里的一个任务由两种模态共同组成。标注对象有单一稳定 ID，每个对象分别持有可选的 `pointCloud` 和 `panorama` 形状；因此可先标一侧，再由人工选择该对象关联另一侧。
@@ -75,6 +75,8 @@ Atlas Studio
 ## 模型服务接口
 
 `src/prelabel.ts` 定义 `PrelabelProvider.predict(request)`；HTTP 适配器先 `POST {endpoint}/assets` 上传双模态文件，再 `POST {endpoint}/predict`。工作台已接入模型选择与人工审核；普通图片使用单独的 `atlas-image-v1` 适配器。详细协议见 [模型接口契约](MODEL_API.md)及[切换说明](MODEL_SWITCHING.md)。
+
+视觉 LLM 使用另一条适配路径：`src/modelRegistry.ts` 保存千问／DeepSeek 模型名称，`src/modelApi.ts` 将当前图片或全景缩放后送到同源 `/api/llm/predict`，`scripts/llmGateway.mjs` 按提供方读取各自的 Key、允许模型和上游地址。服务端仅接受本机同源请求，并验证类别和归一化框。图片框进入图片候选层；全景框转为右侧全景多边形候选，不自动关联点云 3D 对象。详见 [LLM 接入说明](LLM_PROVIDERS.md)。
 
 | 字段 | 说明 |
 | --- | --- |
