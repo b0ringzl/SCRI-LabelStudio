@@ -2,11 +2,24 @@
 
 一个参考 Label Studio 工作流的前端原型，用于室内外建筑组件、标志和地物的多源标注。当前阶段实现界面、配对数据导入、配准核验、人工标注，以及可切换 HTTP 模型服务的预测与人工审核流程。仓库不包含真实 AI 模型或服务端数据库。
 
+## 千问与 DeepSeek 视觉辅助预标注
+
+**已提供可切换的接入接口**：在“预标注接口”页新增模型服务，选择“千问视觉 · 本机代理”或“DeepSeek 视觉 · 本机代理”，填写允许使用的模型名（示例分别为 `qwen3-vl-plus`、`deepseek-flash`）。两家模型可同时配置，分别选择用于普通图片或点云／全景配对任务；模型权重不包含在仓库中。
+
+| 提供方 | 启动前在终端设置 | 模型示例 |
+| --- | --- | --- |
+| 千问（百炼） | `DASHSCOPE_API_KEY`、所在地域的 `ATLAS_LLM_BASE_URL`、`ATLAS_LLM_MODELS` | `qwen3-vl-plus` |
+| DeepSeek | `DEEPSEEK_API_KEY`、`ATLAS_DEEPSEEK_MODELS`；企业网关可另设 `ATLAS_DEEPSEEK_BASE_URL` | `deepseek-flash` |
+
+设置环境变量后，从**同一个终端**运行 Windows 的 `Start-Atlas-Windows.bat` 或 macOS 的 `Start-Atlas-macOS.command`。进入标注页选择模型并点击“运行当前图片”或“运行当前配对任务”；预测先显示为待审核候选，人工接受后才进入标注。普通图片返回 2D 框候选；配对任务只把当前全景影像发送给视觉模型，返回全景 2D 区域候选，**不会由视觉 LLM 生成点云 3D 框或逐点标签**。API Key 仅由本机启动进程读取，不填入界面或提交到仓库；运行预测时当前影像会发送给对应模型服务。
+
+Windows PowerShell 与 macOS Terminal 的完整启动命令、地域地址和接口边界见 [千问／DeepSeek 接入指南](docs/LLM_PROVIDERS.md)；其他 HTTP 模型的配置与审核流程见 [模型切换说明](docs/MODEL_SWITCHING.md)。云端模型的实际定位效果仍需使用团队数据验证。
+
 ## 当前批次：道路设施预标注复核
 
 本次任务以 `label/data` 中的文件为准。`data_for_annotation` 有 900 张普通 JPG 与同名 YOLO 标签，类别是 `sign`、`sign_s`、`fence`、`sign_p`、`fence_v`、`sign_d`、`pole`。启动后默认进入“道路设施复核”：可增删、移动、调整 2D 框，修正类别，筛选疑似重复框，逐张确认并导出 YOLO ZIP。具体定义和一致性规则见 [道路设施复核说明](docs/ROAD_FURNITURE_REVIEW.md)。这批目录没有点云文件；原有点云/全景联合工作台仍保留在导航中。
 
-真实道路设施图片、标签和 PPTX 只在本机读取，不提交仓库，也不进入 Windows/macOS 交付包。其他电脑运行时，在复核页选择 `data_for_annotation` 文件夹即可。当前默认复核的是文件中已有的预测结果；如另行配置兼容服务，可对当前图片重新运行模型并审核候选。现在也可通过本机代理接入千问或 DeepSeek 视觉模型；配置和双平台启动命令见 [LLM 接入说明](docs/LLM_PROVIDERS.md)。
+真实道路设施图片、标签和 PPTX 只在本机读取，不提交仓库，也不进入 Windows/macOS 交付包。其他电脑运行时，在复核页选择 `data_for_annotation` 文件夹即可。当前默认复核的是文件中已有的预测结果；如另行配置兼容服务，可对当前图片重新运行模型并审核候选。
 
 ## 本地打开
 
