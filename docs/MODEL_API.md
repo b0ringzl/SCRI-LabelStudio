@@ -2,6 +2,8 @@
 
 新增的 `qwen-vl-v1` 和 `deepseek-vision-v1` 通过本机 `/api/llm/predict` 代理 OpenAI 兼容视觉接口，不使用下述 `/assets` 上传协议；字段、环境变量及限制见 [LLM 接入说明](LLM_PROVIDERS.md)。
 
+如需用已审核的教师候选训练自有学生模型，请使用独立的 [蒸馏接口 v1.0](DISTILLATION_API.md)。它以经确认的 2D 标签清单和原始影像为输入，不把本页的预测响应直接当训练真值。
+
 ## 当前道路设施图片批次
 
 当前复核页读取 `data_for_annotation/labels/*.txt` 中已经生成的 YOLO 预标注。YOLO 每行是 `classId centerX centerY width height`，后四项归一化到 `[0,1]`，类别编号严格按 `class.txt`：`sign, sign_s, fence, sign_p, fence_v, sign_d, pole`。此外，用户可配置 `atlas-image-v1` 服务对当前图片另行预测，输出先进入待审核层。道路设施批次没有点云和相机外参，不使用下述点云/全景联合预测接口。详见 [批次规则](ROAD_FURNITURE_REVIEW.md)和[模型切换说明](MODEL_SWITCHING.md)。

@@ -10,7 +10,8 @@
 2. `npm ci` 安装锁定依赖。
 3. `npm run dev` 启动本机开发服务，使用终端实际显示的地址。
 4. `npm run build` 检查 TypeScript 并构建静态文件。
-5. `npm run package` 生成 `release/AtlasStudio-Windows-v*.zip` 和 `release/AtlasStudio-macOS-v*.zip`。
+5. `npm run test:distillation` 检查已审核样本筛选、教师来源和无效框拦截。
+6. `npm run package` 生成 `release/AtlasStudio-Windows-v*.zip` 和 `release/AtlasStudio-macOS-v*.zip`。
 
 `node_modules/`、`dist/`、`release/` 都是本机生成物，不提交。GitHub Actions 会在 push 和 PR 后重新构建并上传两份交付 ZIP。Mac 启动文件在 ZIP 内保留可执行权限；如果从源码检出后需要直接运行，可使用 `sh ./Start-Atlas-macOS.command`。
 
@@ -23,3 +24,5 @@
 - 不要提交原始多 GB 点云、设备私有路径、密钥或由外部项目复制来的源码。
 
 模型同事先读 [预标注服务接口](docs/MODEL_API.md)与[模型切换说明](docs/MODEL_SWITCHING.md)，界面同事先读 [UI 设计说明](docs/UI_DESIGN.md)。新增模型输出不要直接覆盖人工标注；预测结果需要审核步骤。可用 `node examples/mock-model-server.mjs` 验证两个图片模型和一个点云／全景模型的切换。
+
+实现学生训练服务的同事请先读 [蒸馏接口 v1.0](docs/DISTILLATION_API.md)。前端目前只导出**已确认**图片的训练清单；服务端负责影像集上传、不可变数据快照、异步训练与独立人工真值评估。不要把普通 YOLO 复核进度 ZIP 中的未确认任务直接用于训练，也不要把云模型 Key 或真实影像提交到仓库。

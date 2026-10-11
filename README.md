@@ -15,6 +15,10 @@
 
 Windows PowerShell 与 macOS Terminal 的完整启动命令、地域地址和接口边界见 [千问／DeepSeek 接入指南](docs/LLM_PROVIDERS.md)；其他 HTTP 模型的配置与审核流程见 [模型切换说明](docs/MODEL_SWITCHING.md)。云端模型的实际定位效果仍需使用团队数据验证。
 
+## 教师模型蒸馏接口
+
+可把千问／DeepSeek 的候选结果人工审核后作为自有 **2D 检测模型**的训练标签。道路设施复核页新增“导出蒸馏清单”：只包含已确认图片、归一化框和教师来源，保留已确认的空图；原始影像需单独交给外部训练服务。训练服务接口定义了影像集上传、数据集注册、异步训练、独立真值评估和任务状态查询；仓库目前**不运行训练，也不自动部署学生模型**。当前视觉 LLM 没有提供可用 logits，这一版使用经人工确认的硬标签；全景 2D 候选不能直接训练点云 3D 框。数据结构、请求示例及同事分工见 [蒸馏接口设计](docs/DISTILLATION_API.md)。
+
 ## 当前批次：道路设施预标注复核
 
 本次任务以 `label/data` 中的文件为准。`data_for_annotation` 有 900 张普通 JPG 与同名 YOLO 标签，类别是 `sign`、`sign_s`、`fence`、`sign_p`、`fence_v`、`sign_d`、`pole`。启动后默认进入“道路设施复核”：可增删、移动、调整 2D 框，修正类别，筛选疑似重复框，逐张确认并导出 YOLO ZIP。具体定义和一致性规则见 [道路设施复核说明](docs/ROAD_FURNITURE_REVIEW.md)。这批目录没有点云文件；原有点云/全景联合工作台仍保留在导航中。
@@ -38,7 +42,7 @@ ZIP 已包含构建结果与示例数据。启动脚本会在本机开启网页�
 
 本轮道路设施复核、模型切换和千问／DeepSeek 接入的逐提交说明见 [2026-10-09 合并说明](docs/MERGE_NOTES_2026-10-09.md)。
 
-源码、可共享的合成演示数据、双平台启动脚本和打包脚本可放入同一个 GitHub 仓库。`node_modules/`、`dist/`、`release/` 及真实尖沙咀裁剪样本不提交；每次推送或发起 PR 后，[构建工作流](.github/workflows/build.yml)检查 TypeScript 和打包，并上传两个 ZIP 作为 Actions artifacts。协作者按 [贡献指南](CONTRIBUTING.md)提交 PR。模型与界面协作分别参阅 [模型接口契约](docs/MODEL_API.md) 和 [UI 设计说明](docs/UI_DESIGN.md)。
+源码、可共享的合成演示数据、双平台启动脚本和打包脚本可放入同一个 GitHub 仓库。`node_modules/`、`dist/`、`release/` 及真实尖沙咀裁剪样本不提交；每次推送或发起 PR 后，[构建工作流](.github/workflows/build.yml)检查 TypeScript 和打包，并上传两个 ZIP 作为 Actions artifacts。协作者按 [贡献指南](CONTRIBUTING.md)提交 PR。模型、蒸馏与界面协作分别参阅 [模型接口契约](docs/MODEL_API.md)、[蒸馏接口设计](docs/DISTILLATION_API.md) 和 [UI 设计说明](docs/UI_DESIGN.md)。
 
 ## 已实现的工作流
 
@@ -101,6 +105,7 @@ python .\scripts\prepare_vmms_sample.py
 - `src/boxFitting.ts`：点云选区初始拟合、旋转框内点检测与计数。
 - `src/types.ts`：任务、类别、配准、联合标注和模型接口数据类型。
 - `src/modelRegistry.ts`、`src/modelApi.ts`、`src/prelabel.ts`：模型配置、协议校验和 HTTP 适配器。
+- `src/distillation.ts`、`src/distillationContract.ts`、`src/distillationClient.ts`：已审核训练清单、蒸馏服务类型与客户端接口。
 - `scripts/prepare_vmms_sample.py`：内置真实样本预处理。
 
 当前标注工具是界面和数据契约原型：3D 框支持水平旋转，全景支持点和多边形，点云支持手工逐点分类；框选拟合仅提供初值，混杂背景时需要人工修正。逐点分类依据导入后点的索引，重新采样同一文件后索引可能变化。尚无自动地面分离、平面检测、连通组件分割、跨视图自动关联、精配准求解、批量任务持久化、多人协作或内置真实模型；推理须连接外部兼容服务。

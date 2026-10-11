@@ -22,6 +22,7 @@ jobs:
           python-version: '3.13'
       - run: npm ci
       - run: npm run test:llm
+      - run: npm run test:distillation
       - run: npm run build
       - run: npm run package
       - uses: actions/upload-artifact@v7
