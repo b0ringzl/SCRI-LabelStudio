@@ -2,7 +2,7 @@
 .review-title { display: flex; align-items: center; justify-content: space-between; gap: 20px; }
 .review-title h1 { margin: 5px 0 4px; font-size: 27px; letter-spacing: -.025em; }
 .review-title p { margin: 0; color: #718097; font-size: 13px; }
-.review-title-actions { display: flex; align-items: center; gap: 8px; }
+.review-title-actions { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 8px; }
 .review-import-progress { display: inline-flex; align-items: center; gap: 7px; border: 1px solid #dcdfee; border-radius: 9px; padding: 10px 12px; background: white; color: #6357bc; font-weight: 700; cursor: pointer; white-space: nowrap; }
 .review-import-progress:disabled { opacity: .45; cursor: default; }
 .review-export, .review-confirm, .review-import > button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; border: 0; border-radius: 9px; padding: 11px 16px; background: #6657d8; color: white; font-weight: 700; cursor: pointer; white-space: nowrap; }
@@ -108,4 +108,4 @@
 .review-message.warn { background: #8e6328; }
 .review-message button { margin-left: 10px; border: 0; background: transparent; color: inherit; cursor: pointer; font-size: 18px; }
 @media (max-width: 1180px) { .review-layout { grid-template-columns: 190px minmax(320px, 1fr); } .review-inspector { grid-column: 1 / -1; max-height: 350px; } }
-@media (max-width: 760px) { .review-layout { display: flex; flex-direction: column; height: auto; } .review-queue { max-height: 230px; } .review-center { min-height: 440px; } .review-title { align-items: flex-start; flex-direction: column; } .review-summary { gap: 10px; } .review-canvas-foot { flex-direction: column; align-items: stretch; } }
+@media (max-width: 760px) { .review-layout { display: flex; flex-direction: column; height: auto; } .review-queue { max-height: 230px; } .review-center { min-height: 440px; } .review-title { align-items: flex-start; flex-direction: column; } .review-title-actions { justify-content: flex-start; } .review-summary { gap: 10px; } .review-canvas-foot { flex-direction: column; align-items: stretch; } }
