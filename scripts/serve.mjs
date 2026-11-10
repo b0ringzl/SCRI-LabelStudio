@@ -5,6 +5,8 @@ import { basename, dirname, extname, isAbsolute, join, relative, resolve } from 
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { handleLlmPredict } from './llmGateway.mjs';
+import { handleRegistration } from './registrationGateway.mjs';
+import { createSceneGateway } from './sceneCatalogGateway.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..', 'dist');
 const projectRoot = resolve(root, '..');
@@ -13,6 +15,10 @@ const argumentsList = process.argv.slice(2);
 const noOpen = argumentsList.includes('--no-open');
 const portFlag = argumentsList.indexOf('--port');
 const requestedPort = portFlag >= 0 ? Number(argumentsList[portFlag + 1]) : Number(process.env.ATLAS_STUDIO_PORT ?? 43127);
+const sceneFlag = argumentsList.indexOf('--scene-dir');
+const sceneDirectory = sceneFlag >= 0 ? argumentsList[sceneFlag + 1] : process.env.ATLAS_SCENE_DATA_DIR;
+if (sceneFlag >= 0 && (!sceneDirectory || sceneDirectory.startsWith('--'))) throw new Error('--scene-dir 需要一个场景目录');
+const localScene = sceneDirectory ? await createSceneGateway(resolve(sceneDirectory)) : null;
 const mime = {
   '.html': 'text/html; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8',
@@ -110,12 +116,21 @@ async function serveFile(request, response) {
     response.end();
     return;
   }
+  if (pathname.startsWith('/api/local-scene/')) {
+    if (localScene) await localScene.handle(request, response, pathname);
+    else { response.writeHead(404); response.end(); }
+    return;
+  }
   if (pathname === '/api/review-manifest') {
     await serveReviewManifest(request, response);
     return;
   }
   if (pathname === '/api/llm/predict') {
     await handleLlmPredict(request, response);
+    return;
+  }
+  if (pathname === '/api/registration/automatic') {
+    await handleRegistration(request, response);
     return;
   }
   if (request.method !== 'GET' && request.method !== 'HEAD') {
@@ -185,7 +200,7 @@ for (const port of [...Array.from({ length: 11 }, (_, index) => requestedPort + 
   }
 }
 
-const url = `http://${host}:${usedPort}/`;
+const url = `http://${host}:${usedPort}/${localScene ? '?localScene=1' : ''}`;
 console.log(`Atlas Studio 已启动：${url}`);
 if (reviewDataRoot) console.log('本地道路设施复核数据集已就绪。');
 console.log('仅本机可访问；按 Ctrl+C 停止。');

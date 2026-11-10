@@ -147,3 +147,11 @@ sequenceDiagram
 2. 将服务地址添加到配置页，运行单任务并人工审核候选；在真实模型上校验类别与坐标。
 3. 大规模部署前增加异步作业、资产清理、认证、审计和多人冲突控制。
 4. 用点云、全景、注册位姿和逐点标签的固定样本进行端到端检查，重点验证 3D→全景投影与类别 ID。
+
+
+## 0.14.0 人工轮廓导出扩展
+
+人工多帧观测 `annotations[].observations[]` 增加可选 `vertices: [u,v][]`，保存归一化球面轮廓；保留 frameId、bounds 和 center。新几何候选的 triangulation 附带 method=`silhouette` 与 supportPointCount。旧 schemaVersion 0.2 不变，旧记录缺失 vertices 时按 bounds 兼容读取。当前模型请求仍针对单个配对任务，未新增多帧推理端点；这些扩展主要用于人工标注保存/导出，不表示现有千问/DeepSeek 已能生成点云 3D 标注。协议示例和更新后的几何处理见 [轮廓编辑接口](PANORAMA_CONTOUR_EDITING.md)。
+
+
+0.14.1 新增逐帧 `observations[].extent`（object/surface，缺失按 surface），新人工对象默认圈完整物体。`triangulation.extent` 区分整体与单面候选；模式进入撤销历史、编辑保持、范围变更清除派生框，混用会拒绝定位。未改变模型推理或训练端点。界面流程及代码入口见 [墙体厚度说明](WALL_VOLUME_0.14.1.md)。

@@ -4,7 +4,6 @@ import { ArrowDownToLine, ArrowLeft, ArrowRight, Check, ChevronRight, CircleHelp
   FileUp, FolderOpen, RotateCcw, Search, Sparkles, Trash2, TriangleAlert, ZoomIn, ZoomOut } from 'lucide-react';
 import { ROAD_CLASSES, duplicatePairs, parseYolo, serializeYolo, validateClassOrder } from './reviewData';
 import type { ReviewBox, ReviewManifest, ReviewTask } from './reviewData';
-import { buildDistillationManifest } from './distillation';
 import { runImageModel } from './modelApi';
 import type { ModelProfile } from './modelRegistry';
 import './review.css';
@@ -51,18 +50,25 @@ function dragBox(drag: Drag, x: number, y: number): ReviewBox {
   return { ...source, x: (left + right) / 2, y: (top + bottom) / 2, w: right - left, h: bottom - top };
 }
 
+export interface ReviewSession { datasetId: string; items: ReviewTask[]; activeName: string }
+
 interface Props {
+  session?: ReviewSession | null;
+  onSessionChange: (session: ReviewSession) => void;
+  view: 'data' | 'annotate';
+  showImport?: boolean;
+  onData: () => void; onAnnotate: () => void;
   models: ModelProfile[];
   selectedModelId: string;
   onSelectModel: (id: string) => void;
   onOpenSettings: () => void;
 }
 
-export default function ImageReview({ models, selectedModelId, onSelectModel, onOpenSettings }: Props) {
-  const [datasetId, setDatasetId] = useState('');
-  const [items, setItems] = useState<ReviewTask[]>([]);
-  const itemsRef = useRef<ReviewTask[]>([]);
-  const [activeName, setActiveName] = useState('');
+export default function ImageReview({ models, selectedModelId, onSelectModel, onOpenSettings, session, onSessionChange, view, onData, onAnnotate, showImport }: Props) {
+  const [datasetId, setDatasetId] = useState(session?.datasetId ?? '');
+  const [items, setItems] = useState<ReviewTask[]>(session?.items ?? []);
+  const itemsRef = useRef<ReviewTask[]>(session?.items ?? []);
+  const [activeName, setActiveName] = useState(session?.activeName ?? session?.items[0]?.name ?? '');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [selectedClass, setSelectedClass] = useState(0);
   const [imageUrl, setImageUrl] = useState('');
@@ -121,6 +127,7 @@ export default function ImageReview({ models, selectedModelId, onSelectModel, on
   useEffect(() => {
     folderInput.current?.setAttribute('webkitdirectory', '');
     folderInput.current?.setAttribute('directory', '');
+    if (session?.items.length) return;
     let live = true;
     fetch('/api/review-manifest').then(async (response) => {
       if (!response.ok) return;
@@ -129,6 +136,8 @@ export default function ImageReview({ models, selectedModelId, onSelectModel, on
     }).catch(() => { /* Portable folder picker is still available. */ });
     return () => { live = false; };
   }, []);
+
+  useEffect(() => { if (datasetId) onSessionChange({ datasetId, items, activeName }); }, [datasetId, items, activeName, onSessionChange]);
 
   const active = items.find((item) => item.name === activeName);
   const selectedModel = models.find((model) => model.id === selectedModelId && model.modality === 'image2d');
@@ -333,6 +342,7 @@ export default function ImageReview({ models, selectedModelId, onSelectModel, on
   }
 
   useEffect(() => {
+    if (view !== 'annotate') return;
     const onKey = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null;
       if (target?.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target?.tagName ?? '')) return;
@@ -344,7 +354,7 @@ export default function ImageReview({ models, selectedModelId, onSelectModel, on
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [activeName, active, selectedId, selectedClass, items]);
+  }, [activeName, active, selectedId, selectedClass, items, view]);
 
   async function importFiles(files: File[]) {
     const scoped = files.some((file) => file.webkitRelativePath.includes('data_for_annotation/'))
@@ -385,21 +395,6 @@ export default function ImageReview({ models, selectedModelId, onSelectModel, on
     anchor.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
     setMessage(`已导出 ${items.length} 份 YOLO 标签；其中 ${stats.reviewed} 张已确认。`);
-  }
-
-  function exportDistillationManifest() {
-    try {
-      const manifest = buildDistillationManifest(datasetId, items, models);
-      const url = URL.createObjectURL(new Blob([JSON.stringify(manifest, null, 2)], { type: 'application/json' }));
-      const anchor = document.createElement('a');
-      anchor.href = url;
-      anchor.download = `${datasetId || 'road-furniture'}-distillation-v1.json`;
-      anchor.click();
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
-      setMessage(`已导出 ${manifest.samples.length} 张已确认图片的训练清单；影像文件需单独提供给训练服务。`);
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : '蒸馏清单导出失败');
-    }
   }
 
   async function importProgress(file?: File) {
@@ -447,11 +442,18 @@ export default function ImageReview({ models, selectedModelId, onSelectModel, on
   const fitWidth = Math.max(100, Math.min(canvasSize.width - 36,
     (canvasSize.height - 36) * imageSize.width / imageSize.height, imageSize.width));
 
+  if (view === 'data') return <div className="road-review image-data-panel">
+    {items.length > 0 && <div className="image-session-summary"><div><strong>{datasetId}</strong><p>{items.length} 张图片 · {items.filter(item => item.reviewed).length} 张已核验</p></div><button className="button button-primary" onClick={onAnnotate}>进入图片标注<ArrowRight size={15}/></button></div>}
+    {(showImport || !items.length) && <div className="review-import"><FolderOpen size={32} /><h2>导入图片与 YOLO 标签</h2><p>本机启动服务会自动读取已配置的数据目录。其他电脑可选择含 images、labels、class.txt 的文件夹。图片和标签只在当前浏览器中读取。</p><input ref={folderInput} type="file" multiple hidden onChange={(event) => void importFiles(Array.from(event.target.files ?? []))} /><button onClick={() => folderInput.current?.click()}><FolderOpen size={18} />选择数据文件夹</button><div className="review-import-fallback"><label>或分别选取图片<input type="file" accept="image/*" multiple onChange={(event) => setExtraImages(Array.from(event.target.files ?? []))} /></label><label>与 YOLO 标签<input type="file" accept=".txt,text/plain" multiple onChange={(event) => setExtraLabels(Array.from(event.target.files ?? []))} /></label><button disabled={!extraImages.length || !extraLabels.length} onClick={() => void importFiles([...extraImages, ...extraLabels])}>载入所选文件</button></div></div>}
+    <div className="data-progress-restore"><input ref={progressInput} type="file" accept=".zip,application/zip" hidden onChange={(event) => void importProgress(event.target.files?.[0])} /><button className="review-import-progress" disabled={!items.length} onClick={() => progressInput.current?.click()} title="导入 ZIP 并覆盖当前本地复核状态"><FileUp size={17} />导入进度 ZIP</button></div>
+    {message && <p role="status">{message}</p>}
+  </div>;
+
   return <div className="road-review">
-    <div className="review-title"><div><span className="eyebrow">ROAD FURNITURE · YOLO REVIEW</span><h1>道路设施预标注复核</h1><p>依据本次 900 张图片与七类标注规范，逐张修正重复、错误和遗漏的 2D 框。</p></div><div className="review-title-actions"><input ref={progressInput} type="file" accept=".zip,application/zip" hidden onChange={(event) => void importProgress(event.target.files?.[0])} /><button className="review-import-progress" disabled={!items.length} onClick={() => progressInput.current?.click()} title="导入 ZIP 并覆盖当前本地复核状态"><FileUp size={17} />导入进度 ZIP</button><button className="review-import-progress" disabled={!stats.reviewed} onClick={exportDistillationManifest} title="仅导出已确认图片的标注和教师来源，不包含影像文件"><ArrowDownToLine size={17} />导出蒸馏清单</button><button className="review-export" disabled={!items.length} onClick={exportYolo}><ArrowDownToLine size={17} />导出 YOLO ZIP</button></div></div>
+    <div className="review-title"><div><span className="eyebrow">03 / ANNOTATE</span><h1>图片标注与核验</h1><p>修正已有框、审核模型候选，确认后进入训练数据准备。</p></div><div className="review-title-actions"><button className="review-export" disabled={!items.length} onClick={exportYolo}><ArrowDownToLine size={17} />导出 YOLO ZIP</button></div></div>
     <div className="review-summary"><span><strong>{items.length}</strong> 张图片</span><span><strong>{stats.reviewed}</strong> 已确认</span><span><strong>{stats.boxes}</strong> 个框</span><span className={stats.duplicates ? 'warning' : ''}><strong>{stats.duplicates}</strong> 张疑似重复</span><span className="review-source">{datasetId || '尚未载入数据'}</span></div>
     <div className="review-model-bar"><Sparkles size={17} /><label>辅助模型<select aria-label="道路设施辅助模型" value={selectedModel?.id ?? ''} onChange={(event) => onSelectModel(event.target.value)}><option value="">选择图片模型</option>{models.filter((model) => model.modality === 'image2d').map((model) => <option key={model.id} value={model.id}>{model.name}</option>)}</select></label><button onClick={() => void runModel()} disabled={!active || !selectedModel || runningModel || candidates.length > 0}>{runningModel ? '运行中…' : '运行当前图片'}</button>{runningModel && <button onClick={() => modelAbort.current?.abort()}>取消</button>}<button className="review-model-settings" onClick={onOpenSettings}>管理模型</button><span>点击运行后才上传当前图片；切换图片或模型会丢弃未审核候选。</span></div>
-    {!items.length && <div className="review-import"><FolderOpen size={32} /><h2>载入 data_for_annotation</h2><p>本机启动服务会自动读取已配置的数据目录。其他电脑可选择含 images、labels、class.txt 的文件夹。图片和标签只在当前浏览器中读取。</p><input ref={folderInput} type="file" multiple hidden onChange={(event) => void importFiles(Array.from(event.target.files ?? []))} /><button onClick={() => folderInput.current?.click()}><FolderOpen size={18} />选择数据文件夹</button><div className="review-import-fallback"><label>或分别选取图片<input type="file" accept="image/*" multiple onChange={(event) => setExtraImages(Array.from(event.target.files ?? []))} /></label><label>与 YOLO 标签<input type="file" accept=".txt,text/plain" multiple onChange={(event) => setExtraLabels(Array.from(event.target.files ?? []))} /></label><button disabled={!extraImages.length || !extraLabels.length} onClick={() => void importFiles([...extraImages, ...extraLabels])}>载入所选文件</button></div></div>}
+    {!items.length && <div className="review-import"><FolderOpen size={32}/><h2>还没有图片数据</h2><p>请先在“数据”中导入图片与 YOLO 标签。</p><button onClick={onData}>前往数据管理<ArrowRight size={16}/></button></div>}
     {items.length > 0 && <div className="review-layout">
       <aside className="review-queue"><div className="review-queue-head"><strong>图片任务</strong><span>{filtered.length} / {items.length}</span></div><div className="review-search"><Search size={15} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="搜索文件名" /></div><div className="review-filters">{([['all', '全部'], ['pending', '待确认'], ['reviewed', '已确认'], ['empty', '空标注'], ['duplicates', '疑似重复']] as [Filter, string][]).map(([value, label]) => <button key={value} className={filter === value ? 'active' : ''} onClick={() => setFilter(value)}>{label}</button>)}</div><div className="review-task-list">{filtered.map((item) => <button key={item.name} className={`review-task ${item.name === activeName ? 'active' : ''}`} onClick={() => selectTask(item.name)}><span className={item.reviewed ? 'review-task-state done' : 'review-task-state'}>{item.reviewed ? <Check size={12} /> : null}</span><span className="review-task-copy"><strong title={item.name}>{item.name}</strong><small>{item.boxes.length} 框{duplicatePairs(item.boxes).length ? ' · 疑似重复' : ''}</small></span><ChevronRight size={15} /></button>)}</div></aside>
       <main className="review-center"><div className="review-image-head"><div><strong>{active?.name}</strong><span>{activeIndex + 1} / {items.length} · {active?.reviewed ? '已确认' : '待复核'}</span></div><div className="review-image-actions"><button onClick={() => setZoom((value) => Math.max(1, value / 1.5))} disabled={zoom <= 1} title="缩小"><ZoomOut size={17} /></button><span>{Math.round(zoom * 100)}%</span><button onClick={() => setZoom((value) => Math.min(6, value * 1.5))} disabled={zoom >= 6} title="放大"><ZoomIn size={17} /></button><button onClick={() => step(-1)} disabled={activeIndex <= 0} title="上一张"><ArrowLeft size={17} /></button><button onClick={() => step(1)} disabled={activeIndex >= items.length - 1} title="下一张"><ArrowRight size={17} /></button><button onClick={undo} disabled={!active || !(undoRef.current[active.name]?.length)} title="撤销 Ctrl+Z"><RotateCcw size={17} /></button></div></div><div ref={canvasRef} className="review-canvas"><div className="review-image-stage" style={{ width: Math.round(fitWidth * zoom) }}><img src={imageUrl} alt={active?.name ?? ''} draggable={false} onLoad={(event) => setImageSize({ width: event.currentTarget.naturalWidth, height: event.currentTarget.naturalHeight })} /><svg viewBox="0 0 1000 1000" preserveAspectRatio="none" onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={pointerUp} onPointerCancel={pointerUp}>

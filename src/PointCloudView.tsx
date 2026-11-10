@@ -1,12 +1,16 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
-import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import type { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { TransformControls } from 'three/examples/jsm/controls/TransformControls.js';
 import { countPointsInCuboid, fitCuboidFromScreenRect, pointInCuboid } from './boxFitting';
 import { nearestPointOnRay } from './geometry';
-import type { Annotation, ClassDefinition, Cuboid, Registration, ToolMode, Vec3 } from './types';
+import type { Annotation, ClassDefinition, Cuboid, Registration, TiePoint, ToolMode, Vec3 } from './types';
+import { ViewSync, dragOrientation, recordCamera, tieMarker, clearTieMarkers } from './viewSync';
+import { displaySpacing, intensityLimits } from './cloudDisplay';
+import type { PointDisplayRange } from './cloudDisplay';
+import { createOrbitFromCamera, observationOrbitTarget } from './cameraOrbit';
 
-type ViewMode = 'perspective' | 'top' | 'front';
+type ViewMode = 'current' | 'perspective' | 'top' | 'front';
 type EditMode = 'translate' | 'scale' | 'rotate';
 const EMPTY_PREVIEWS: Annotation[] = [];
 const EMPTY_PREVIEW_LABELS: Record<string, string> = {};
@@ -20,6 +24,11 @@ interface Props {
   previewSemanticLabels?: Record<string, string>;
   selectedId: string | null;
   registration: Registration;
+  viewSync: ViewSync;
+  linked: boolean;
+  tiePoints: TiePoint[];
+  pendingTiePoint: Vec3 | null;
+  pointDisplayRanges?: PointDisplayRange[];
   tool: ToolMode;
   focusSelected: boolean;
   onToggleFocus: () => void;
@@ -30,6 +39,7 @@ interface Props {
   canUndoPaint: boolean;
   onSelect: (id: string | null) => void;
   onEmptySelection: () => void;
+  onTiePointPick?: (point: Vec3) => void;
 }
 
 interface SceneState {
@@ -37,6 +47,7 @@ interface SceneState {
   scene: THREE.Scene;
   camera: THREE.PerspectiveCamera;
   controls: OrbitControls;
+  rebaseOrbit: (target: THREE.Vector3) => void;
   transform: TransformControls;
   transformTarget: THREE.Object3D;
   selectedAnnotationId: string | null;
@@ -45,6 +56,10 @@ interface SceneState {
   raycaster: THREE.Raycaster;
   bounds: { center: THREE.Vector3; distance: number } | null;
   baseColors: Float32Array | null;
+  ties: THREE.Group;
+  intensityRange: [number,number];
+  pointFovUniform: {value:number} | null;
+  pointSizeUniforms: { scale:{value:number}; adaptive:{value:number} } | null;
 }
 
 function disposeOverlays(group: THREE.Group) {
@@ -59,7 +74,7 @@ function disposeOverlays(group: THREE.Group) {
 }
 
 function applyViewPreset(view: SceneState, mode: ViewMode) {
-  if (!view.bounds) return;
+  if (!view.bounds || mode === 'current') return;
   const { center, distance } = view.bounds;
   view.controls.target.copy(center);
   view.camera.up.set(0, mode === 'top' ? 0 : 1, mode === 'top' ? -1 : 0);
@@ -67,10 +82,10 @@ function applyViewPreset(view: SceneState, mode: ViewMode) {
   else if (mode === 'front') view.camera.position.copy(center).add(new THREE.Vector3(0, 0, distance));
   else view.camera.position.copy(center).add(new THREE.Vector3(distance * 0.48, distance * 0.34, distance * 0.76));
   view.camera.lookAt(center);
-  view.controls.update();
+  view.rebaseOrbit(center);
 }
 
-export default function PointCloudView({ geometry, annotations, previewAnnotations = EMPTY_PREVIEWS, classes, semanticLabels, previewSemanticLabels = EMPTY_PREVIEW_LABELS, selectedId, registration, tool, focusSelected, onToggleFocus, onCreate, onUpdate, onPaint, onUndoPaint, canUndoPaint, onSelect, onEmptySelection }: Props) {
+export default function PointCloudView({ geometry, annotations, previewAnnotations = EMPTY_PREVIEWS, classes, semanticLabels, previewSemanticLabels = EMPTY_PREVIEW_LABELS, selectedId, registration, viewSync, linked, tiePoints, pendingTiePoint, pointDisplayRanges, tool, focusSelected, onToggleFocus, onCreate, onUpdate, onPaint, onUndoPaint, canUndoPaint, onSelect, onEmptySelection, onTiePointPick }: Props) {
   const host = useRef<HTMLDivElement>(null);
   const state = useRef<SceneState | null>(null);
   const createRef = useRef(onCreate);
@@ -78,10 +93,19 @@ export default function PointCloudView({ geometry, annotations, previewAnnotatio
   const paintRef = useRef(onPaint);
   const selectRef = useRef(onSelect);
   const emptyRef = useRef(onEmptySelection);
+  const tiePointRef = useRef(onTiePointPick);
   const mode = useRef(tool);
   const [viewMode, setViewMode] = useState<ViewMode>('perspective');
   const [editMode, setEditMode] = useState<EditMode>('translate');
-  const [pointSize, setPointSize] = useState(0.23);
+  const [pointSize, setPointSize] = useState(2.2);
+  const [pointSizeMode, setPointSizeMode] = useState('adaptive');
+  const [adaptiveAvailable, setAdaptiveAvailable] = useState(false);
+  const pointDisplay = useRef({size:pointSize,mode:pointSizeMode});
+  pointDisplay.current = {size:pointSize,mode:pointSizeMode};
+  const [colorMode, setColorMode] = useState('enhanced');
+  const liveRef = useRef({ linked, registration, viewSync });
+  const previousLinked = useRef(linked);
+  liveRef.current = { linked, registration, viewSync };
   const [selectionRect, setSelectionRect] = useState<{ left: number; top: number; width: number; height: number } | null>(null);
   const [brushCursor, setBrushCursor] = useState<{ left: number; top: number } | null>(null);
   createRef.current = onCreate;
@@ -89,6 +113,7 @@ export default function PointCloudView({ geometry, annotations, previewAnnotatio
   paintRef.current = onPaint;
   selectRef.current = onSelect;
   emptyRef.current = onEmptySelection;
+  tiePointRef.current = onTiePointPick;
   mode.current = tool;
   const selectedBox = annotations.find((item) => item.id === selectedId)?.pointCloud;
   const selectedPointCount = useMemo(() => selectedBox ? countPointsInCuboid(geometry, selectedBox) : 0, [geometry, selectedBox]);
@@ -103,23 +128,27 @@ export default function PointCloudView({ geometry, annotations, previewAnnotatio
     view.controls.update();
   };
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const element = host.current;
     if (!element) return;
     const scene = new THREE.Scene();
     scene.background = new THREE.Color('#141c29');
-    scene.fog = new THREE.FogExp2('#141c29', 0.0045);
     const camera = new THREE.PerspectiveCamera(52, 1, 0.1, 5000);
     camera.position.set(22, 19, 31);
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     element.appendChild(renderer.domElement);
-    const controls = new OrbitControls(camera, renderer.domElement);
-    controls.enableDamping = true;
-    controls.dampingFactor = 0.08;
-    controls.target.set(0, 1, -4);
-    controls.update();
+    const recordOrbit = () => { if (!liveRef.current.linked) recordCamera(element, camera); };
+    camera.lookAt(0, 1, -4);
+    let controls = createOrbitFromCamera(camera, renderer.domElement, new THREE.Vector3(0, 1, -4), recordOrbit);
+    const rebaseOrbit = (target: THREE.Vector3) => {
+      controls.dispose();
+      controls = createOrbitFromCamera(camera, renderer.domElement, target, recordOrbit);
+      controls.enabled = !liveRef.current.linked;
+      if (state.current) state.current.controls = controls;
+      recordOrbit();
+    };
     const grid = new THREE.GridHelper(100, 40, '#50617a', '#2d3a4d');
     grid.position.y = -1.6;
     grid.material.transparent = true;
@@ -135,7 +164,7 @@ export default function PointCloudView({ geometry, annotations, previewAnnotatio
     const transform = new TransformControls(camera, renderer.domElement);
     transform.setSize(0.78);
     scene.add(transform.getHelper());
-    transform.addEventListener('dragging-changed', (event) => { controls.enabled = !event.value; });
+    transform.addEventListener('dragging-changed', (event) => { controls.enabled = !event.value && !liveRef.current.linked; });
     transform.addEventListener('objectChange', () => {
       const id = state.current?.selectedAnnotationId;
       if (!id) return;
@@ -152,8 +181,9 @@ export default function PointCloudView({ geometry, annotations, previewAnnotatio
       });
     });
     const raycaster = new THREE.Raycaster();
-    raycaster.params.Points.threshold = 0.5;
-    state.current = { renderer, scene, camera, controls, transform, transformTarget, selectedAnnotationId: null, cloud: null, overlays, raycaster, bounds: null, baseColors: null };
+    raycaster.params.Points.threshold = 0.07;
+    const ties = new THREE.Group(); scene.add(ties);
+    state.current = { renderer, scene, camera, controls, rebaseOrbit, transform, transformTarget, selectedAnnotationId: null, cloud: null, overlays, raycaster, bounds: null, baseColors: null, ties, intensityRange:[0,1], pointFovUniform:null, pointSizeUniforms:null };
 
     const resize = () => {
       const width = element.clientWidth;
@@ -169,11 +199,13 @@ export default function PointCloudView({ geometry, annotations, previewAnnotatio
     let frame = 0;
     const render = () => {
       frame = requestAnimationFrame(render);
-      controls.update();
-      renderer.render(scene, camera);
+      if (!liveRef.current.linked) controls.update();
+      grid.visible = !liveRef.current.linked; axes.visible = !liveRef.current.linked;
+      if(state.current?.pointFovUniform) state.current.pointFovUniform.value=1/Math.tan(THREE.MathUtils.degToRad(camera.fov)*.5);
+      if (element.clientWidth) renderer.render(scene, camera);
     };
     render();
-    let down: { x: number; y: number; selecting: boolean; painting: boolean; erase: boolean; indices?: Set<number>; projected?: Float32Array; lastX?: number; lastY?: number } | null = null;
+    let down: { x: number; y: number; world: THREE.Quaternion; selecting: boolean; painting: boolean; erase: boolean; indices?: Set<number>; projected?: Float32Array; lastX?: number; lastY?: number } | null = null;
     const projectCloud = () => {
       const positions = state.current?.cloud?.geometry.getAttribute('position');
       if (!positions) return null;
@@ -215,12 +247,12 @@ export default function PointCloudView({ geometry, annotations, previewAnnotatio
       if (transform.dragging || transform.axis) return;
       const painting = mode.current === 'cloud-paint';
       const selecting = mode.current === 'cuboid' || event.ctrlKey || (painting && event.shiftKey);
-      down = { x: event.clientX, y: event.clientY, selecting, painting, erase: painting && event.altKey,
+      down = { x: event.clientX, y: event.clientY, world: liveRef.current.viewSync.snapshot.quaternion, selecting, painting, erase: painting && event.altKey,
         indices: painting ? new Set<number>() : undefined,
         projected: painting ? projectCloud() ?? undefined : undefined,
         lastX: event.clientX, lastY: event.clientY };
       if (painting && !selecting) brushAt(down, event.clientX, event.clientY);
-      if (selecting || painting) {
+      if (selecting || painting || liveRef.current.linked) {
         controls.enabled = false;
         renderer.domElement.setPointerCapture(event.pointerId);
       }
@@ -241,7 +273,10 @@ export default function PointCloudView({ geometry, annotations, previewAnnotatio
         down.lastY = event.clientY;
         return;
       }
-      if (!down?.selecting) return;
+      if (!down?.selecting) {
+        if (down && liveRef.current.linked) liveRef.current.viewSync.set(dragOrientation(down.world, event.clientX-down.x, event.clientY-down.y, camera.fov));
+        return;
+      }
       const rect = element.getBoundingClientRect();
       setSelectionRect({
         left: Math.min(down.x, event.clientX) - rect.left,
@@ -256,7 +291,7 @@ export default function PointCloudView({ geometry, annotations, previewAnnotatio
       down = null;
       const moved = Math.hypot(event.clientX - start.x, event.clientY - start.y);
       if (start.painting) {
-        controls.enabled = true;
+        controls.enabled = !liveRef.current.linked;
         setSelectionRect(null);
         if (start.selecting && start.projected) {
           const left = Math.min(start.x, event.clientX);
@@ -275,7 +310,7 @@ export default function PointCloudView({ geometry, annotations, previewAnnotatio
         return;
       }
       if (start.selecting) {
-        controls.enabled = true;
+        controls.enabled = !liveRef.current.linked;
         setSelectionRect(null);
         if (moved < 8 && mode.current !== 'cuboid') return;
         const cloud = state.current?.cloud;
@@ -306,6 +341,29 @@ export default function PointCloudView({ geometry, annotations, previewAnnotatio
         -((event.clientY - rect.top) / rect.height) * 2 + 1,
       );
       raycaster.setFromCamera(pointer, camera);
+      if (mode.current === 'tie-point' && view.cloud) {
+        const hit = raycaster.intersectObject(view.cloud, false)[0];
+        const source = view.cloud.geometry.getAttribute('position');
+        let point: Vec3 | null = hit?.index !== undefined ? [source.getX(hit.index), source.getY(hit.index), source.getZ(hit.index)] : null;
+        if (!point) {
+          const projected = projectCloud();
+          const positions = view.cloud.geometry.getAttribute('position');
+          let bestIndex = -1, bestPixelDistance = 12 * 12, bestDepth = Infinity;
+          if (projected) for (let index = 0; index < positions.count; index++) {
+            const offset = index * 3;
+            const dx = projected[offset] - event.clientX, dy = projected[offset + 1] - event.clientY;
+            const distance = dx * dx + dy * dy, depth = projected[offset + 2];
+            if (!Number.isFinite(depth) || distance > 12 * 12) continue;
+            if (distance < bestPixelDistance - 9 || (Math.abs(distance - bestPixelDistance) <= 9 && depth < bestDepth)) {
+              bestIndex = index; bestPixelDistance = distance; bestDepth = depth;
+            }
+          }
+          if (bestIndex >= 0) point = [positions.getX(bestIndex), positions.getY(bestIndex), positions.getZ(bestIndex)];
+        }
+        if (point) tiePointRef.current?.(point);
+        else emptyRef.current();
+        return;
+      }
       const hitBox = raycaster.intersectObjects(view.overlays.children, true)
         .find((hit) => typeof hit.object.userData.annotationId === 'string');
       if (hitBox) {
@@ -319,7 +377,14 @@ export default function PointCloudView({ geometry, annotations, previewAnnotatio
         : nearestPointOnRay(view.cloud.geometry, [raycaster.ray.origin.x, raycaster.ray.origin.y, raycaster.ray.origin.z], raycaster.ray.direction);
       if (point) createRef.current({ kind: 'cuboid', center: point, size: [1.4, 1.4, 1.4], yaw: 0 });
     };
-    const onCancel = () => { down = null; controls.enabled = true; setSelectionRect(null); };
+    const onCancel = () => { down = null; controls.enabled = !liveRef.current.linked; setSelectionRect(null); };
+    const onWheel = (event: WheelEvent) => {
+      if (!liveRef.current.linked) return;
+      event.preventDefault();
+      const current = liveRef.current.viewSync.snapshot;
+      liveRef.current.viewSync.set(current.quaternion, current.fov + Math.sign(event.deltaY)*4);
+    };
+    renderer.domElement.addEventListener('wheel', onWheel, { passive: false });
     renderer.domElement.addEventListener('pointerdown', onDown);
     renderer.domElement.addEventListener('pointermove', onMove);
     renderer.domElement.addEventListener('pointerup', onUp);
@@ -327,6 +392,8 @@ export default function PointCloudView({ geometry, annotations, previewAnnotatio
     return () => {
       cancelAnimationFrame(frame);
       observer.disconnect();
+      renderer.domElement.removeEventListener('wheel', onWheel);
+      clearTieMarkers(ties);
       renderer.domElement.removeEventListener('pointerdown', onDown);
       renderer.domElement.removeEventListener('pointermove', onMove);
       renderer.domElement.removeEventListener('pointerup', onUp);
@@ -358,7 +425,10 @@ export default function PointCloudView({ geometry, annotations, previewAnnotatio
       view.baseColors = null;
     }
     if (!geometry) return;
+    view.intensityRange=intensityLimits(geometry.getAttribute('intensity'));
+    setColorMode(!geometry.getAttribute('color') || geometry.userData.generatedColors ? (geometry.getAttribute('intensity') ? 'intensity' : 'height') : 'enhanced');
     if (!geometry.getAttribute('color')) {
+      geometry.userData.generatedColors = true;
       const position = geometry.getAttribute('position');
       const intensity = geometry.getAttribute('intensity');
       const color = new Float32Array(position.count * 3);
@@ -375,7 +445,8 @@ export default function PointCloudView({ geometry, annotations, previewAnnotatio
       }
       geometry.setAttribute('color', new THREE.BufferAttribute(color, 3));
     }
-    const colors = geometry.getAttribute('color');
+    if (!geometry.getAttribute('sourceColor')) geometry.setAttribute('sourceColor', geometry.getAttribute('color').clone());
+    const colors = geometry.getAttribute('sourceColor');
     const baseColors = new Float32Array(colors.count * 3);
     for (let i = 0; i < colors.count; i++) {
       baseColors[i * 3] = colors.getX(i);
@@ -384,7 +455,25 @@ export default function PointCloudView({ geometry, annotations, previewAnnotatio
     }
     geometry.setAttribute('color', new THREE.BufferAttribute(baseColors.slice(), 3));
     view.baseColors = baseColors;
-    const material = new THREE.PointsMaterial({ size: pointSize, vertexColors: true, sizeAttenuation: true, transparent: true, opacity: 0.95 });
+    const spacing=displaySpacing(geometry.getAttribute('position').count,pointDisplayRanges);
+    setAdaptiveAvailable(Boolean(spacing));
+    const material = new THREE.PointsMaterial({ size: pointDisplay.current.size, vertexColors: true, sizeAttenuation: false });
+    view.pointFovUniform=null;
+    view.pointSizeUniforms=null;
+    if(spacing) {
+      geometry.setAttribute('hintSpacing',new THREE.BufferAttribute(spacing,1));
+      material.onBeforeCompile=(shader)=>{
+        shader.uniforms.pointFovFactor={value:1/Math.tan(THREE.MathUtils.degToRad(view.camera.fov)*.5)};
+        shader.uniforms.pointUserScale={value:pointDisplay.current.size/2.2};
+        shader.uniforms.pointAdaptive={value:pointDisplay.current.mode==='adaptive' ? 1 : 0};
+        view.pointFovUniform=shader.uniforms.pointFovFactor;
+        view.pointSizeUniforms={scale:shader.uniforms.pointUserScale,adaptive:shader.uniforms.pointAdaptive};
+        shader.vertexShader='attribute float hintSpacing;\nuniform float pointFovFactor;\nuniform float pointUserScale;\nuniform float pointAdaptive;\n'+shader.vertexShader;
+        // Clamp the automatic baseline FIRST, then apply the user scale. Applying
+        // the user scale inside clamp made +/- ineffective on saturated points.
+        shader.vertexShader=shader.vertexShader.replace('#include <logdepthbuf_vertex>','if (pointAdaptive > 0.5) { gl_PointSize = clamp((size / pointUserScale) * (scale / max(0.01, -mvPosition.z)) * hintSpacing * pointFovFactor, 1.0, 10.0) * pointUserScale; }\n#include <logdepthbuf_vertex>');
+      };
+    }
     const cloud = new THREE.Points(geometry, material);
     view.cloud = cloud;
     view.scene.add(cloud);
@@ -395,11 +484,41 @@ export default function PointCloudView({ geometry, annotations, previewAnnotatio
       view.bounds = { center: sphere.center.clone(), distance };
       view.camera.far = Math.max(1000, distance * 10);
       view.camera.updateProjectionMatrix();
-      applyViewPreset(view, viewMode);
+      if (!liveRef.current.linked) {
+        const preset = viewMode === 'current' ? 'perspective' : viewMode;
+        applyViewPreset(view, preset);
+        setViewMode(preset);
+      }
     }
   }, [geometry]);
 
-  useEffect(() => { if (state.current) applyViewPreset(state.current, viewMode); }, [viewMode]);
+  useLayoutEffect(() => {
+    const view = state.current;
+    if (!view) return;
+    const leavingSync = previousLinked.current && !linked;
+    previousLinked.current = linked;
+    if (leavingSync) {
+      view.rebaseOrbit(observationOrbitTarget(view.camera));
+      setViewMode('current');
+    }
+    view.controls.enabled = !linked;
+    if (!linked) return;
+    return viewSync.subscribe((shared) => {
+      view.camera.position.set(...registration.position);
+      view.camera.quaternion.copy(shared.quaternion);
+      view.camera.fov = shared.fov; view.camera.updateProjectionMatrix();
+      view.camera.updateMatrixWorld();
+      if (host.current) recordCamera(host.current, view.camera);
+    });
+  }, [viewSync, linked, registration, geometry]);
+
+  useEffect(() => {
+    const group = state.current?.ties;
+    if (!group) return;
+    clearTieMarkers(group);
+    tiePoints.forEach((pair, i) => { const marker = tieMarker(String(i + 1)); marker.position.set(...pair.cloud); group.add(marker); });
+    if (pendingTiePoint) { const marker = tieMarker('+', '#7cead4'); marker.position.set(...pendingTiePoint); group.add(marker); }
+  }, [tiePoints, pendingTiePoint]);
   useEffect(() => {
     const view = state.current;
     if (!view) return;
@@ -426,9 +545,18 @@ export default function PointCloudView({ geometry, annotations, previewAnnotatio
     }
   }, [selectedId, selectedBox, tool]);
   useEffect(() => {
-    const material = state.current?.cloud?.material as THREE.PointsMaterial | undefined;
+    const view=state.current;
+    const material = view?.cloud?.material as THREE.PointsMaterial | undefined;
     if (material) material.size = pointSize;
-  }, [pointSize, geometry]);
+    if(view?.pointSizeUniforms) {
+      view.pointSizeUniforms.scale.value=pointSize/2.2;
+      view.pointSizeUniforms.adaptive.value=pointSizeMode==='adaptive' ? 1 : 0;
+    }
+    if(host.current) {
+      host.current.dataset.pointSize=pointSize.toFixed(1);
+      host.current.dataset.pointSizeMode=adaptiveAvailable ? pointSizeMode : 'fixed';
+    }
+  }, [pointSize, pointSizeMode, adaptiveAvailable, geometry]);
 
   useEffect(() => {
     const view = state.current;
@@ -485,33 +613,49 @@ export default function PointCloudView({ geometry, annotations, previewAnnotatio
     }));
     const target = colors.array as Float32Array;
     const base = view.baseColors;
+    const tint = new THREE.Color();
+    const intensity=geometry?.getAttribute('intensity');
+    const [iLow,iHigh]=view.intensityRange;
     for (let i = 0; i < positions.count; i++) {
       const brightness = box && !pointInCuboid(positions.getX(i), positions.getY(i), positions.getZ(i), box) ? 0.08 : 1;
       const labelColor = labelColors.get(semanticLabels[i]);
       const candidateColor = !labelColor && previewSemanticLabels[i] !== undefined ? [0.72, 0.43, 1] : null;
-      target[i * 3] = (labelColor?.[0] ?? candidateColor?.[0] ?? base[i * 3]) * brightness;
-      target[i * 3 + 1] = (labelColor?.[1] ?? candidateColor?.[1] ?? base[i * 3 + 1]) * brightness;
-      target[i * 3 + 2] = (labelColor?.[2] ?? candidateColor?.[2] ?? base[i * 3 + 2]) * brightness;
+      let r = base[i*3], g = base[i*3+1], b = base[i*3+2];
+      if (colorMode === 'intensity' && intensity) {
+        const v=intensity.getX(i);const t=Number.isFinite(v) ? THREE.MathUtils.clamp((v-iLow)/(iHigh-iLow),0,1) : 0;
+        r=g=b=.02+.6*Math.pow(t,1.5);
+      } else if (colorMode === 'height') {
+        tint.setHSL(.58-THREE.MathUtils.clamp((positions.getY(i)+3)/28,0,1)*.5, .45, .56);
+        r=tint.r; g=tint.g; b=tint.b;
+      } else if (colorMode === 'enhanced') {
+        r=Math.min(.95,r*2.5+.035); g=Math.min(.95,g*2.5+.035); b=Math.min(.95,b*2.5+.035);
+      }
+      target[i*3] = (labelColor?.[0] ?? candidateColor?.[0] ?? r)*brightness;
+      target[i*3+1] = (labelColor?.[1] ?? candidateColor?.[1] ?? g)*brightness;
+      target[i*3+2] = (labelColor?.[2] ?? candidateColor?.[2] ?? b)*brightness;
     }
     colors.needsUpdate = true;
-  }, [geometry, annotations, selectedId, focusSelected, semanticLabels, previewSemanticLabels, classes]);
+  }, [geometry, annotations, selectedId, focusSelected, semanticLabels, previewSemanticLabels, classes, colorMode]);
 
   return <div className={`viewer-canvas point-view ${tool === 'cuboid' || tool === 'cloud-paint' ? 'crosshair' : ''}`} aria-label="三维点云视图">
     <div ref={host} className="point-canvas-host" />
     {selectionRect && <div className="cloud-selection-rect" style={selectionRect} />}
     {tool === 'cloud-paint' && brushCursor && <div className="cloud-brush-cursor" style={brushCursor} />}
     <div className="point-view-controls">
-      <select aria-label="点云视角" value={viewMode} onChange={(event) => setViewMode(event.target.value as ViewMode)}>
+      {!linked && <select aria-label="点云视角" value={viewMode} onChange={(event) => { const next=event.target.value as ViewMode; setViewMode(next); if(state.current)applyViewPreset(state.current,next); }}>
+        <option value="current" disabled>当前视角</option>
         <option value="perspective">透视</option><option value="top">俯视</option><option value="front">正视</option>
-      </select>
-      <button onClick={onToggleFocus} disabled={!selectedBox} className={focusSelected ? 'active' : ''} title="突出显示框内点">聚焦</button>
-      <button onClick={() => setPointSize((size) => Math.max(0.06, size - 0.06))} title="减小点大小">−</button>
-      <button onClick={() => setPointSize((size) => Math.min(1, size + 0.06))} title="增大点大小">+</button>
+      </select>}
+      <select aria-label="点云着色" value={colorMode} onChange={(event) => setColorMode(event.target.value)}>{geometry?.getAttribute('intensity') && <option value="intensity">强度对比</option>}<option value="height">高程增强</option>{geometry?.getAttribute('color') && !geometry.userData.generatedColors && <><option value="enhanced">亮度增强</option><option value="rgb">原始颜色</option></>}</select>
+      {selectedBox && <button onClick={onToggleFocus} className={focusSelected ? 'active' : ''} title="突出显示框内点">聚焦</button>}
+      <select aria-label="点径模式" value={adaptiveAvailable ? pointSizeMode : 'fixed'} onChange={(event)=>setPointSizeMode(event.target.value)}><option value="adaptive" disabled={!adaptiveAvailable}>自适应点径</option><option value="fixed">固定像素</option></select>
+      <label className="point-size-label">点大小<output aria-label="当前点大小">{adaptiveAvailable && pointSizeMode==='adaptive' ? (pointSize/2.2).toFixed(1)+'×' : pointSize.toFixed(1)+' px'}</output></label>
+      <div className="point-size-slider"><button aria-label="减小点大小" disabled={pointSize<=.6} onClick={() => setPointSize((size) => Math.max(.6, Number((size - .4).toFixed(1))))}>−</button><input type="range" aria-label="点大小" min="0.6" max="8.2" step="0.2" value={pointSize} onChange={(event)=>setPointSize(Number(event.target.value))}/><button aria-label="增大点大小" disabled={pointSize>=8.2} onClick={() => setPointSize((size) => Math.min(8.2, Number((size + .4).toFixed(1))))}>+</button></div>
     </div>
     {selectedBox && <div className="cloud-point-count">框内 {selectedPointCount.toLocaleString()} 点</div>}
     {selectedBox && tool !== 'cloud-paint' && <div className="cloud-edit-controls" role="group" aria-label="3D 框直接调整">
       <span>拖动手柄调整框</span>
-      <button onClick={locateSelectedBox} title="将视角移近当前 3D 框，便于精细调整">定位到框</button>
+      <button disabled={linked} onClick={locateSelectedBox} title="将视角移近当前 3D 框，便于精细调整">定位到框</button>
       <button className={editMode === 'translate' ? 'active' : ''} onClick={() => setEditMode('translate')}>移动</button>
       <button className={editMode === 'scale' ? 'active' : ''} onClick={() => setEditMode('scale')}>尺寸</button>
       <button className={editMode === 'rotate' ? 'active' : ''} onClick={() => setEditMode('rotate')}>旋转</button>

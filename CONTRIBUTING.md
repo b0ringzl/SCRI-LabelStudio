@@ -2,6 +2,8 @@
 
 本仓库保持一份 React/Three.js 源码，始终从同一次构建产出 Windows 和 macOS 两个交付包。请在自己的分支修改代码，通过 Pull Request 合并，避免维护功能不同步的两个代码副本。
 
+此处为公开成果仓库 `b0ringzl/SCRI-LabelStudio`；团队开发主线另行维护。公开贡献请从本仓库最新 `main` 建功能分支，PR 目标也选本仓库 `main`，由维护者审核并同步；在 PR 中按功能说明改动、接口兼容性、两平台构建结果和已知限制。现有模块索引见 [功能与协作交接](docs/FEATURE_HANDOFF.md)。
+
 当前 900 张道路设施图片的复核入口与七类 YOLO 规则见 [道路设施复核说明](docs/ROAD_FURNITURE_REVIEW.md)。不要把 `label/data` 的真实 JPG、TXT、JSON 或 PPTX 复制进仓库或交付 ZIP；复核结果用工作台导出的 YOLO ZIP 交接。
 
 ## 开发与交付

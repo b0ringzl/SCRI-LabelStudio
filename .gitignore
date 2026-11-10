@@ -8,3 +8,15 @@ public/sample-cloud.pcd
 public/sample-panorama.jpg
 public/sample-metadata.json
 .atlas-local-data.json
+local-samples/
+local-models/
+__pycache__/
+.venv-extrinsics/
+.venv-scene-import/
+.venv-registration/
+/output/pdf/
+/tmp/pdfs/
+
+# Public snapshot excludes private survey video projects.
+videos/
+**/assets/private/

@@ -1,0 +1,7 @@
+{
+  "schemaVersion": "registration/1.0",
+  "frames": [
+    {"image": "1.jpg", "utcSeconds": 1.0, "cameraToCloud": [1,0,0,0, 0,1,0,1.6, 0,0,1,0, 0,0,0,1]},
+    {"image": "2.jpg", "utcSeconds": 2.0, "cameraToCloud": [1,0,0,1, 0,1,0,1.6, 0,0,1,0, 0,0,0,1]}
+  ]
+}
