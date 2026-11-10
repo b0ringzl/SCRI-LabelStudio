@@ -130,7 +130,7 @@ def main() -> None:
         "ins_roll_pitch_heading_rad": [float(frame[key]) for key in ("roll_rad", "pitch_rad", "heading_rad")],
         "point_coordinate_system": "camera-local: +X right, +Y up, -Z forward",
         "panorama_projection": "u=0.5-atan2(left,forward)/(2*pi), v=0.5-asin(up/r)/pi",
-        "registration_status": "INS platform-frame approximation; camera lever arm and boresight are unavailable",
+        "registration_status": "INS platform-frame approximation; camera lever arm, boresight, and this stream's panorama zero-azimuth remain unverified",
         "source_panorama": frame["source_image_relpath"],
         "source_pointcloud_files": by_file,
         "eligible_points": eligible,

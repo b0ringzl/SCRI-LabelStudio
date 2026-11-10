@@ -1,0 +1,131 @@
+{
+  "revision": "2026-11-10-automatic",
+  "captureSoftwareVersion": "0.15.0 (updated settings/automatic panels); other walkthrough captures 0.14.1",
+  "captureSource": "Current UI; locally generated synthetic building; no survey data",
+  "figures": [
+    {
+      "id": "figure-01-import", "size": [760, 660],
+      "panels": [
+        {"source":"01-browser-import.png","crop":[20,105,690,174],"at":[40,10,690,174]},
+        {"source":"01-browser-import.png","crop":[20,282,690,124],"at":[40,200,690,124]},
+        {"source":"01-browser-import.png","crop":[724,282,690,124],"at":[40,340,690,124]},
+        {"source":"01-browser-import.png","crop":[20,418,690,60],"at":[40,480,690,60]},
+        {"source":"01-browser-import.png","crop":[1218,480,210,48],"at":[415,575,315,72]}
+      ],
+      "pins":[
+        {"n":1,"badge":[24,55],"target":[94,52]},
+        {"n":2,"badge":[24,246],"target":[370,258]},
+        {"n":3,"badge":[24,388],"target":[365,397]},
+        {"n":4,"badge":[24,510],"target":[235,510]},
+        {"n":5,"badge":[365,607],"target":[614,610]}
+      ]
+    },
+    {
+      "id":"figure-02-native", "size":[1000,520],
+      "panels":[
+        {"source":"02-native-import.png","crop":[20,30,700,140],"at":[25,15,950,190]},
+        {"source":"02-native-import.png","crop":[30,180,680,100],"at":[25,225,950,140]},
+        {"source":"02-native-import.png","crop":[730,180,680,100],"at":[25,375,950,140]}
+      ],
+      "pins":[{"n":1,"badge":[40,170],"target":[282,65]}, {"n":2,"badge":[47,317],"target":[360,313]}, {"n":3,"badge":[47,463],"target":[365,463]}]
+    },
+    {
+      "id":"figure-03-views", "size":[1100,600],
+      "panels":[
+        {"source":"10-next-frame.png","crop":[1505,175,390,50],"at":[30,20,1014,130]},
+        {"source":"10-next-frame.png","crop":[230,285,600,38],"at":[30,172,1014,64]},
+        {"source":"10-next-frame.png","crop":[225,395,1674,530],"at":[30,257,1014,321]}
+      ],
+      "pins":[{"n":1,"badge":[62,128],"target":[225,87]}, {"n":2,"badge":[713,127],"target":[662,88]}, {"n":3,"badge":[65,232],"target":[270,205]}, {"n":4,"badge":[475,325],"target":[497,316]}]
+    },
+    {
+      "id":"figure-04-pose",
+      "panels":[{"source":"07-settings.png","crop":[1545,182,345,454],"at":[85,15,575,757]}],
+      "size":[760,800],
+      "pins":[{"n":1,"badge":[708,57],"target":[580,46]}, {"n":2,"badge":[36,239],"target":[252,247]}, {"n":3,"badge":[35,424],"target":[324,423]}, {"n":4,"badge":[35,615],"target":[322,614]}, {"n":5,"badge":[705,724],"target":[292,727]}]
+    },
+    {
+      "id":"figure-05-pair", "size":[1100,700],
+      "panels":[
+        {"source":"04-pick-cloud.png","crop":[230,235,800,35],"at":[25,15,1050,46]},
+        {"source":"04-pick-cloud.png","crop":[445,460,375,225],"at":[25,100,505,303]},
+        {"source":"05-paired-point.png","crop":[1293,460,375,225],"at":[570,100,505,303]},
+        {"source":"05-paired-point.png","crop":[1648,235,240,40],"at":[445,440,630,105]}
+      ],
+      "pins":[{"n":1,"badge":[58,86],"target":[130,183]}, {"n":2,"badge":[605,86],"target":[678,178]}, {"n":3,"badge":[376,493],"target":[538,491]}],
+      "shapes":[{"type":"text","x":110,"y":72,"text":"A  选左后：+ 表示待配对","size":23,"color":"#16243b"}, {"type":"text","x":650,"y":72,"text":"B  点右后：#1 表示已配对","size":23,"color":"#16243b"}, {"type":"text","x":30,"y":582,"text":"左图是待配对，右图是完成配对后的状态。","size":30,"color":"#16243b"}, {"type":"text","x":30,"y":633,"text":"紫色编号是手册操作引导，不是点对 ID。","size":26,"color":"#64748b"}]
+    },
+    {
+      "id":"figure-06-solve", "size":[1100,650],
+      "panels":[
+        {"source":"06-six-pairs.png","crop":[1660,232,230,45],"at":[415,20,660,129]},
+        {"source":"06-six-pairs.png","crop":[360,450,500,220],"at":[25,185,505,222]},
+        {"source":"06-six-pairs.png","crop":[1208,450,500,220],"at":[570,185,505,222]}
+      ],
+      "pins":[{"n":1,"badge":[360,75],"target":[470,83]}, {"n":2,"badge":[1045,175],"target":[925,87]}],
+      "shapes":[
+        {"type":"text","x":30,"y":453,"text":"分布示意：避免挤在一角","size":27,"color":"#bf425d"},
+        {"type":"rect","box":[35,505,440,125],"color":"#dfe5ef"},
+        {"type":"circle","x":73,"y":537,"r":7,"color":"#bf425d"},{"type":"circle","x":94,"y":548,"r":7,"color":"#bf425d"},{"type":"circle","x":78,"y":561,"r":7,"color":"#bf425d"},{"type":"circle","x":103,"y":531,"r":7,"color":"#bf425d"},
+        {"type":"text","x":570,"y":453,"text":"推荐：不同方向、高度与深度","size":27,"color":"#217c75"},
+        {"type":"rect","box":[575,505,500,125],"color":"#dfe5ef"},
+        {"type":"circle","x":610,"y":533,"r":7,"color":"#217c75"},{"type":"circle","x":706,"y":595,"r":7,"color":"#217c75"},{"type":"circle","x":823,"y":536,"r":7,"color":"#217c75"},{"type":"circle","x":944,"y":585,"r":7,"color":"#217c75"},{"type":"circle","x":1040,"y":533,"r":7,"color":"#217c75"}
+      ]
+    },
+    {
+      "id":"figure-07-correct", "size":[900,750],
+      "panels":[
+        {"source":"06-six-pairs.png","crop":[1670,232,115,45],"at":[285,15,330,129]},
+        {"source":"09-delete-pairs.png","crop":[0,0,315,163],"at":[80,190,740,383]}
+      ],
+      "pins":[{"n":1,"badge":[225,73],"target":[469,78]}, {"n":2,"badge":[35,306],"target":[165,292]}, {"n":3,"badge":[34,450],"target":[283,452]}, {"n":4,"badge":[790,620],"target":[437,523]}],
+      "shapes":[{"type":"text","x":65,"y":668,"text":"删除后，返回“同名点精调”重新选择并求解。","size":29,"color":"#16243b"}]
+    },
+    {
+      "id":"figure-08-check", "size":[1100,650],
+      "panels":[
+        {"source":"08-overlay-check.png","crop":[230,235,900,36],"at":[25,12,1050,42]},
+        {"source":"08-overlay-check.png","crop":[765,402,575,300],"at":[25,95,1050,548]}
+      ],
+      "pins":[{"n":1,"badge":[350,73],"target":[417,35]}, {"n":2,"badge":[50,295],"target":[122,174]}, {"n":3,"badge":[1020,380],"target":[1002,295]}]
+    },
+    {
+      "id":"figure-09-save", "size":[1100,570],
+      "panels":[
+        {"source":"08-overlay-check.png","crop":[1680,85,220,50],"at":[280,25,770,175]},
+        {"source":"08-overlay-check.png","crop":[1730,230,166,45],"at":[635,250,415,113]},
+        {"source":"10-next-frame.png","crop":[237,285,400,39],"at":[35,420,1015,99]}
+      ],
+      "pins":[{"n":1,"badge":[1000,225],"target":[870,105]}, {"n":2,"badge":[225,105],"target":[507,105]}, {"n":3,"badge":[580,303],"target":[930,307]}, {"n":4,"badge":[82,552],"target":[325,466]}]
+    },
+    {
+      "id":"figure-10-auto", "size":[1100,890],
+      "panels":[
+        {"source":"07-settings.png","crop":[1558,670,300,110],"at":[200,15,750,275]},
+        {"source":"11-auto-candidate.png","crop":[230,280,520,50],"at":[30,310,1040,100]}
+      ],
+      "pins":[
+        {"n":1,"badge":[145,107],"target":[485,120]}
+      ],
+      "shapes":[
+        {"type":"text","x":35,"y":435,"text":"合成样本真实候选；以下为核验与交接示意。","size":27,"color":"#64748b"},
+        {"type":"rect","box":[30,490,320,95],"color":"#dfe5ef"},
+        {"type":"text","x":55,"y":521,"text":"2  安装独立 CPU 环境","size":28,"color":"#16243b"},
+        {"type":"rect","box":[390,490,320,95],"color":"#dfe5ef"},
+        {"type":"text","x":415,"y":521,"text":"3  启动并检查服务","size":28,"color":"#16243b"},
+        {"type":"rect","box":[750,490,320,95],"color":"#dfe5ef"},
+        {"type":"text","x":775,"y":521,"text":"4  当前帧 / 全部帧","size":28,"color":"#16243b"},
+        {"type":"line","from":[352,537],"to":[385,537]},
+        {"type":"line","from":[712,537],"to":[745,537]},
+        {"type":"rect","box":[30,650,320,95],"color":"#dfe5ef"},
+        {"type":"text","x":55,"y":681,"text":"5  预览 / 查看原位姿","size":27,"color":"#16243b"},
+        {"type":"rect","box":[390,650,320,95],"color":"#dfe5ef"},
+        {"type":"text","x":415,"y":681,"text":"6  应用或舍弃候选","size":28,"color":"#16243b"},
+        {"type":"rect","box":[750,650,320,95],"color":"#dfe5ef"},
+        {"type":"text","x":775,"y":681,"text":"7  核验并保存导出","size":28,"color":"#16243b"},
+        {"type":"line","from":[352,697],"to":[385,697]},
+        {"type":"line","from":[712,697],"to":[745,697]}
+      ]
+    }
+  ]
+}

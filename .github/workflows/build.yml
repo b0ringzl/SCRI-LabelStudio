@@ -9,6 +9,28 @@ permissions:
   contents: read
 
 jobs:
+  extrinsics-validation:
+    strategy:
+      matrix:
+        os: [windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: scripts/requirements-extrinsics-validation.txt
+      - run: python -m pip install -r scripts/requirements-extrinsics-validation.txt
+      - run: python scripts/test_extrinsics_validation.py
+      - run: python scripts/test_trial_sampling.py
+      - run: python scripts/test_scene_dataset.py
+      - run: python scripts/test_extract_registration_poses.py
+      - run: python -m pip install -r scripts/requirements-registration.txt
+      - run: python scripts/test_registration_worker.py
+      - run: python -m py_compile scripts/import_and_open.py scripts/complete_scene_coverage.py scripts/package_generalization_suite.py
+      - run: python -m py_compile scripts/validate_vendor_color_control.py
+      - run: python -m py_compile scripts/prepare_trial_scene.py scripts/package_scene_trial.py
   package:
     runs-on: ubuntu-latest
     steps:
@@ -21,10 +43,19 @@ jobs:
         with:
           python-version: '3.13'
       - run: npm ci
+      - run: python scripts/check_registration_manual.py
       - run: npm run test:llm
       - run: npm run test:distillation
+      - run: npm run test:contours
+      - run: npm run test:registration
+      - run: npm run test:automatic-registration
+      - run: npm run test:local-scene
+      - run: npm run test:view-sync
+      - run: npm run test:scene-import
+      - run: npm run test:workflow
       - run: npm run build
       - run: npm run package
+      - run: python scripts/test_release_packages.py
       - uses: actions/upload-artifact@v7
         with:
           name: AtlasStudio-Windows

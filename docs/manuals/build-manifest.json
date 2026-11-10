@@ -1,0 +1,107 @@
+{
+  "revision": "2026-11-10",
+  "softwareVersion": "0.15.0",
+  "sourceSha256": "d538001aaf68e96a934304d2a147c2ed435b349c1b19084c0d121ff0c9347547",
+  "builderSha256": "66bfca13c6245834fc982292e5c339035e252c2c662d9e08506f3e36c02c2ccf",
+  "illustratorSha256": "4dedc048195e4a9a6622bd2633f7425aa928018ca7770458b5fb30864218c6ec",
+  "figureCount": 10,
+  "figureAssets": [
+    {
+      "file": "figures/01-browser-import.png",
+      "sha256": "57f5f591deb357c6216a1ea19e486cdd6d3b774c87d8a75ea2d66ad6896d79af"
+    },
+    {
+      "file": "figures/02-native-import.png",
+      "sha256": "90c3aefeaad174639e7d04f0794316944682ec067570af177fa8a8fb25d6fbb9"
+    },
+    {
+      "file": "figures/04-pick-cloud.png",
+      "sha256": "bb7be4a60b32c1f1f350d3b70e2e73e47d4b10193bd7edf24c5eb2b514690f7f"
+    },
+    {
+      "file": "figures/05-paired-point.png",
+      "sha256": "64c0b0056401ae5fc56f949ee82af4fd956a67db9747a42d9d89f5c37205be9a"
+    },
+    {
+      "file": "figures/06-six-pairs.png",
+      "sha256": "88dff11a0263a4b36f8994a83bfc5c956fe34d6af90e0e13ab62635ef88f4a7d"
+    },
+    {
+      "file": "figures/07-settings.png",
+      "sha256": "ba4f8e3bf909d89a30a127fa22e6ea6f70ad184cb2c02472fedac02d676138cd"
+    },
+    {
+      "file": "figures/08-overlay-check.png",
+      "sha256": "394bf47c11e94341acaf5903a4e51107dacb5fb723230ce867480b18fe65db63"
+    },
+    {
+      "file": "figures/09-delete-pairs.png",
+      "sha256": "3ecc31bc690c71621aa033dcb990898a8ef8e2c738482ad225f7364423c64824"
+    },
+    {
+      "file": "figures/10-next-frame.png",
+      "sha256": "aac00ff032cd41bcf70fec2ba2435c8fc4616accfb97bc366d2facb6ba8cf45a"
+    },
+    {
+      "file": "figures/11-auto-candidate.png",
+      "sha256": "2bda48dd91bf3dd790cfd1a745a15b101375501f908c7cad0976b7ac07034b3e"
+    },
+    {
+      "file": "figures/figure-01-import.svg",
+      "sha256": "9b44ea0b5eefbeb1816f312dd7386887338d2ca30c232916febfd0d2bf4188ea"
+    },
+    {
+      "file": "figures/figure-02-native.svg",
+      "sha256": "2e3f8a7253939fa42e12bf0a83f5a805e084d73f7def6f4fdfbcd0a633a0cf58"
+    },
+    {
+      "file": "figures/figure-03-views.svg",
+      "sha256": "f6dc88735f3904f1f01b8eaae25f2708bc8911c0b94f007d8297999951e64947"
+    },
+    {
+      "file": "figures/figure-04-pose.svg",
+      "sha256": "f1dec32a9375847746f639e5e8aaa2d493c3e16e9f34bca0c03b69428c3472a9"
+    },
+    {
+      "file": "figures/figure-05-pair.svg",
+      "sha256": "ef502657c094319374b945fcdb0dc8f894c728e1624f745f6d79e94565f783d3"
+    },
+    {
+      "file": "figures/figure-06-solve.svg",
+      "sha256": "297a7fc84dc41cb2cf2b846ac9c64d9a4ea624e79311928d10e7db95f8d3a459"
+    },
+    {
+      "file": "figures/figure-07-correct.svg",
+      "sha256": "262a408d5c929caa63f9df715e4404d647e18ef54047d49cbdfc984b6d4441c6"
+    },
+    {
+      "file": "figures/figure-08-check.svg",
+      "sha256": "502f7597488f444a7b78cdf8b7c8ad69458a62c37b133d5aff62833387855ff4"
+    },
+    {
+      "file": "figures/figure-09-save.svg",
+      "sha256": "de98243d85b56cfe24d25a2af885e60a6c022a2661816f4b2a670990aba5d349"
+    },
+    {
+      "file": "figures/figure-10-auto.svg",
+      "sha256": "607f185bda1354f2076de08afcad744bd334df382dc0ec8388bd3f1178873f53"
+    },
+    {
+      "file": "figures/figures.json",
+      "sha256": "ce19f3ddbbe017abb6b43e4fea9ab43a9a524d67d07a446d26326fffa985ad42"
+    }
+  ],
+  "font": "msyh.ttc",
+  "editions": [
+    {
+      "file": "Registration-Manual-Windows.pdf",
+      "pages": 30,
+      "sha256": "53ce130be20ed4068cdc6ecff25e4e9c677a6ec69cbc24e5a518c626c1daa912"
+    },
+    {
+      "file": "Registration-Manual-macOS.pdf",
+      "pages": 30,
+      "sha256": "6c9609bc3bf89a101d6af0fb4732ddebf4a2d5bd49cb8aec631ee648db5e4d16"
+    }
+  ]
+}
