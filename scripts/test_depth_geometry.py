@@ -29,7 +29,7 @@ class DepthGeometryTest(unittest.TestCase):
     def test_scale_and_six_dof_recovery(self):
         points, depth, prior = fixture()
         result = align_depth(points, depth, prior)
-        print('Depth known-geometry recovery:', result, flush=True)
+        print('Depth known-geometry recovery:', result['status'], result['metrics'], flush=True)
         rotation_error = np.rad2deg(Rotation.from_euler('YXZ', result['registration']['rotation'], degrees=True).magnitude())
         self.assertLess(rotation_error, .4)
         self.assertLess(np.linalg.norm(result['registration']['position']), .08)
