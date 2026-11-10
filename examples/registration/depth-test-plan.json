@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "depth-test-plan/1.0",
+  "defaultSceneKey": "floor6",
+  "groundTruthAvailable": false,
+  "referenceOnly": true,
+  "cases": [
+    {"sceneKey":"floor6","frame":"76.jpg","previousStatus":"candidate","purpose":"先测试深度生成、原位姿/候选对比和人工决定是否应用。"},
+    {"sceneKey":"floor6","frame":"72.jpg","previousStatus":"candidate","purpose":"同场景换帧，检查逐帧位姿和候选不串帧。"},
+    {"sceneKey":"campus","frame":"100.jpg","previousStatus":"rejected","purpose":"室外树木与远景；检查候选被拒绝时保留原位姿。"},
+    {"sceneKey":"library","frame":"4324.jpg","previousStatus":"rejected","purpose":"遮挡与建筑立面；检查深度可查看但不能应用被拒绝候选。"},
+    {"sceneKey":"jianshazui","frame":"frame_001298.jpg","previousStatus":"rejected","purpose":"真实 RGB 局部细节与全局概览；检查 INS 粗初值和较大点云加载。"}
+  ],
+  "interpretation": "previousStatus 来自 0.16.0 的五帧实际运行记录，只供复测参考。浏览器采样、图像编码、设备与初值变化可能改变状态。candidate 不是精度验收；没有独立真值，不能据此证明误差小于 4 度。"
+}

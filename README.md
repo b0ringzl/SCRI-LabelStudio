@@ -8,6 +8,8 @@
 
 DA² 安装：Windows 运行 `Setup-Depth-Windows.bat`；Apple Silicon macOS 执行 `sh ./Setup-Depth-macOS.command`。使用项目独立 `.venv-da2` 和公开官方权重；运行平台后在“配准 → 粗配准”选择 DA²，生成深度并预览位姿候选。需要粗位姿，单目深度不是米制真值；不通过检查时保留原位姿。[安装、模型接口与 UI 用法](docs/DEPTH_REGISTRATION.md) · [0.16.0 详细变更](docs/CHANGELOG_0.16.0.md)。
 
+DA² 配对测试场景：提供本地四场景、32 帧的 Windows / macOS 套件制作工具，保留真实点云、原始全景、逐帧粗位姿，并逐文件校验 SHA-256。含六层候选预览和跨场景拒绝处理的复测步骤；测绘数据不上传 GitHub。[测试场景、启动步骤与复现命令](docs/DEPTH_TEST_SCENES.md)。
+
 自动精配准安装：Windows 运行 `Setup-Registration-Windows.bat`；macOS 运行 `sh ./Setup-Registration-macOS.command`。两者创建项目独立环境 `.venv-registration`，再用原 Start-Atlas 启动器打开平台。需要 Python 3.10+，CPU 即可运行。先导入粗位姿，再在“配准 → 粗配准 → 自动精配准”生成候选，预览后选择应用或舍弃。
 
 [自动配准部署、API 与实测边界](docs/AUTOMATIC_REGISTRATION.md) · [0.15.0 详细更新](docs/CHANGELOG_0.15.0.md)。这是独立的 NumPy/SciPy 球面 NID 实现，不是已部署的 Koide 官方 C++ 程序；不承诺无初值全局配准或真实数据 ≤4°。
