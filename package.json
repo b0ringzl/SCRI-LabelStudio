@@ -1,7 +1,7 @@
 {
   "name": "atlas-annotation-studio",
   "private": true,
-  "version": "0.15.0",
+  "version": "0.16.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -17,7 +17,8 @@
     "test:scene-import": "node scripts/test_scene_catalog.mjs",
     "test:contours": "node scripts/test_panorama_contours.mjs",
     "test:workflow": "node scripts/test_workflow_ui.mjs",
-    "test:automatic-registration": "node scripts/test_automatic_registration.mjs"
+    "test:automatic-registration": "node scripts/test_automatic_registration.mjs",
+    "test:depth-registration": "node scripts/test_depth_registration.mjs"
   },
   "dependencies": {
     "fflate": "^0.8.3",

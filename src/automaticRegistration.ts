@@ -8,8 +8,25 @@ export interface RegistrationMetrics {
   nidBefore:number;nidAfter:number;holdoutBefore:number;holdoutAfter:number;
   visiblePoints:number;rotationChangeDeg:number;positionChangeM:number;durationSeconds:number;starts:number;controlNid:number;contrast:number;
 }
-export interface AutoRegistrationCandidate {
+export interface NidRegistrationCandidate {
+  method:'nid';
   registration:Registration;prior:Registration;algorithmVersion:string;signal:string;metrics:RegistrationMetrics;
+}
+export interface DepthRegistrationMetrics {
+  depthBefore:number;depthAfter:number;holdoutBefore:number;holdoutAfter:number;
+  holdoutP75Before:number;holdoutP75After:number;scaleBefore:number;scaleAfter:number;
+  visiblePoints:number;holdoutPoints:number;rotationChangeDeg:number;positionChangeM:number;
+  durationSeconds:number;starts:number;contrast:number;boundaryReached:number;
+}
+export interface DepthRegistrationCandidate {
+  method:'da2';registration:Registration;prior:Registration;algorithmVersion:string;signal:string;
+  metrics:DepthRegistrationMetrics;
+}
+export type AutoRegistrationCandidate = NidRegistrationCandidate | DepthRegistrationCandidate;
+export function candidateSummary(candidate:AutoRegistrationCandidate) {
+  return candidate.method==='da2'
+    ? `DA² 留出区域深度残差 ${candidate.metrics.holdoutBefore.toFixed(3)} → ${candidate.metrics.holdoutAfter.toFixed(3)}`
+    : `NID ${candidate.metrics.nidBefore.toFixed(4)} → ${candidate.metrics.nidAfter.toFixed(4)}`;
 }
 export function registrationInput(cloud:THREE.BufferGeometry,prior:Registration) {
   const xyz=cloud.getAttribute('position'),intensity=cloud.getAttribute('intensity');
@@ -39,7 +56,7 @@ export function validateCandidate(payload:Record<string,unknown>,prior:Registrat
   const angle=THREE.MathUtils.radToDeg(registrationQuaternion(prior).angleTo(registrationQuaternion(registration)));
   const distance=Math.hypot(...registration.position.map((v,i)=>v-prior.position[i]));
   if(angle>8||distance>1.25)throw new Error('候选修正超出局部精配准范围，原位姿保留');
-  return {registration,prior:structuredClone(prior),algorithmVersion:String(payload.algorithmVersion),signal:String(payload.signal),metrics};
+  return {method:'nid',registration,prior:structuredClone(prior),algorithmVersion:String(payload.algorithmVersion),signal:String(payload.signal),metrics};
 }
 export async function runAutomaticRegistration(cloud:THREE.BufferGeometry,imageUrl:string,frameId:string,prior:Registration,signal?:AbortSignal) {
   const sampled=registrationInput(cloud,prior);

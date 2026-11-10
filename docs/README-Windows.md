@@ -47,3 +47,7 @@
 ## 0.15.0 自动精配准
 
 先运行 `Setup-Registration-Windows.bat`，再正常启动。只安装本项目独立 Python CPU 环境，无需模型权重。导入粗位姿后，在“配准 → 粗配准 → 自动精配准”生成候选，再比较原位姿、应用或舍弃。详见 docs/AUTOMATIC_REGISTRATION.md。
+
+## 0.16.0 DA² 深度辅助配准
+
+运行 `Setup-Depth-Windows.bat` 安装项目独立模型环境和公开权重。启动平台后进入“配准 → 粗配准”，选择“DA² · 全景深度辅助”并运行。展开深度图，切换原位姿/候选核验后再应用。需要粗位姿；预测深度无可靠绝对尺度；未通过检查时保留原位姿。完整操作与接口见 [DA² 配准手册](docs/DEPTH_REGISTRATION.md)。

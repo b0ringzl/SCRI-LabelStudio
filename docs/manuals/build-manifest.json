@@ -1,8 +1,8 @@
 {
   "revision": "2026-11-10",
-  "softwareVersion": "0.15.0",
-  "sourceSha256": "d538001aaf68e96a934304d2a147c2ed435b349c1b19084c0d121ff0c9347547",
-  "builderSha256": "66bfca13c6245834fc982292e5c339035e252c2c662d9e08506f3e36c02c2ccf",
+  "softwareVersion": "0.16.0",
+  "sourceSha256": "c42ba4f7f44e23a7dd2b4de1e081266e5328528084186184b067d573cd8d3037",
+  "builderSha256": "7f1b67411c46906a3aeccb26f89f3f392fd69d09c1797b083df463cc916dee3c",
   "illustratorSha256": "4dedc048195e4a9a6622bd2633f7425aa928018ca7770458b5fb30864218c6ec",
   "figureCount": 10,
   "figureAssets": [
@@ -95,13 +95,13 @@
   "editions": [
     {
       "file": "Registration-Manual-Windows.pdf",
-      "pages": 30,
-      "sha256": "53ce130be20ed4068cdc6ecff25e4e9c677a6ec69cbc24e5a518c626c1daa912"
+      "pages": 31,
+      "sha256": "555d763b674fffe09245475b03dd25d6ab3ad8c9f4155bd1880f3ede4b8a8b49"
     },
     {
       "file": "Registration-Manual-macOS.pdf",
-      "pages": 30,
-      "sha256": "6c9609bc3bf89a101d6af0fb4732ddebf4a2d5bd49cb8aec631ee648db5e4d16"
+      "pages": 31,
+      "sha256": "bb635fa4855427d611d263f40a4c42f6a9946d163d835f8a9bc89ef2ec5a665a"
     }
   ]
 }

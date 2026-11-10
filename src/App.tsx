@@ -32,6 +32,8 @@ import { parseCalibrationDocument } from './registrationIO';
 import { estimatePanoramaYaw, hasUsableRgb } from './autoYaw';
 import { runAutomaticRegistration } from './automaticRegistration';
 import type { AutoRegistrationCandidate } from './automaticRegistration';
+import { runDepthRegistration, validateDepthCandidate } from './depthRegistration';
+import type { DepthRegistrationResult } from './depthRegistration';
 import { solveTiePoints, triangulateTarget } from './registrationMath';
 import { contourPlane, makeObservation, observationVertices, replaceObservation } from './panoramaContours';
 import { AnnotationHistory } from './annotationHistory';
@@ -99,6 +101,8 @@ export default function App() {
   const [registrationQuality, setRegistrationQuality] = useState('');
   const [autoYawRunning, setAutoYawRunning] = useState(false);
   const [autoRegistrationRunning, setAutoRegistrationRunning] = useState(false);
+  const [autoRegistrationMethod, setAutoRegistrationMethod] = useState<'nid'|'da2'>('da2');
+  const [depthResults, setDepthResults] = useState<Record<string, DepthRegistrationResult>>({});
   const [autoRegistrationProgress, setAutoRegistrationProgress] = useState('');
   const [autoRegistrationStatus, setAutoRegistrationStatus] = useState<{ configured: boolean; reason?: string; label?: string } | null>(null);
   const [autoRegistrationCandidates, setAutoRegistrationCandidates] = useState<Record<string, AutoRegistrationCandidate>>({});
@@ -273,10 +277,14 @@ export default function App() {
 
   useEffect(() => { localStorage.setItem('atlas-classes', JSON.stringify(classes)); }, [classes]);
   useEffect(() => {
-    fetch('/api/registration/automatic').then((response) => response.ok ? response.json() : null)
-      .then((status) => setAutoRegistrationStatus(status)).catch(() => setAutoRegistrationStatus({ configured: false, reason: '请使用本项目启动脚本运行，才能连接 无权重自动配准 服务' }));
-    return () => autoRegistrationAbort.current?.abort();
-  }, []);
+    let live=true;
+    setAutoRegistrationStatus(null);
+    fetch(autoRegistrationMethod==='da2'?'/api/registration/depth':'/api/registration/automatic')
+      .then((response) => response.ok ? response.json() : null)
+      .then((status) => { if(live)setAutoRegistrationStatus(status); })
+      .catch(() => { if(live)setAutoRegistrationStatus({ configured: false, reason: '请使用本项目启动脚本运行自动配准服务' }); });
+    return () => { live=false; autoRegistrationAbort.current?.abort(); };
+  }, [autoRegistrationMethod]);
   useEffect(() => { localStorage.setItem('atlas-model-profiles-v1', JSON.stringify(modelProfiles)); }, [modelProfiles]);
   useEffect(() => { localStorage.setItem('atlas-selected-models-v1', JSON.stringify(selectedModels)); }, [selectedModels]);
   useEffect(() => () => pairAbort.current?.abort(), []);
@@ -484,7 +492,8 @@ export default function App() {
   }
 
   async function runAutoRegistration(allFrames: boolean) {
-    if (!geometry || autoRegistrationRunning) return;
+    if(autoRegistrationRunning)return;
+    if(!geometry){flash('点云加载完成后再运行自动配准');return;}
     const controller = new AbortController();
     autoRegistrationAbort.current = controller;
     setAutoRegistrationRunning(true);
@@ -492,10 +501,10 @@ export default function App() {
     const failures: string[] = [];
     let succeeded = 0;
     try {
-      const statusResponse = await fetch('/api/registration/automatic', { signal: controller.signal });
+      const statusResponse = await fetch(autoRegistrationMethod==='da2'?'/api/registration/depth':'/api/registration/automatic', { signal: controller.signal });
       const status = await statusResponse.json() as { configured: boolean; reason?: string; label?: string };
       setAutoRegistrationStatus(status);
-      if (!status.configured) throw new Error(status.reason ?? '无权重自动配准 尚未配置');
+      if (!status.configured) throw new Error(status.reason ?? '自动配准环境尚未配置');
       for (let index = 0; index < targets.length; index++) {
         const frame = targets[index];
         const prior = frame.id === currentFrameId ? registration : frameRegistrations[frame.id] ?? frame.initialRegistration;
@@ -503,8 +512,15 @@ export default function App() {
           failures.push(`${frame.name}：缺少粗位姿`); continue;
         }
         setAutoRegistrationProgress(`${index + 1}/${targets.length} · ${frame.name}`);
+        setAutoRegistrationCandidates((previous) => { const next={...previous};delete next[frame.id];return next; });
         try {
-          const candidate = await runAutomaticRegistration(geometry, frame.url, frame.id, prior, controller.signal);
+          let candidate:AutoRegistrationCandidate;
+          if(autoRegistrationMethod==='da2') {
+            const result=await runDepthRegistration(geometry,frame.url,frame.id,prior,controller.signal);
+            if(controller.signal.aborted||autoRegistrationAbort.current!==controller)break;
+            setDepthResults(previous=>({...previous,[frame.id]:result}));
+            candidate=validateDepthCandidate(result,prior);
+          } else candidate = await runAutomaticRegistration(geometry, frame.url, frame.id, prior, controller.signal);
           if (controller.signal.aborted || autoRegistrationAbort.current !== controller) break;
           setAutoRegistrationCandidates((previous) => ({ ...previous, [frame.id]: candidate }));
           if (frame.id === currentFrameId) { setPreviewAutoRegistration(true); setShowProjection(true); }
@@ -542,7 +558,7 @@ export default function App() {
     setFrameRegistrations((previous) => ({ ...previous,
       ...Object.fromEntries(entries.map(([id, candidate]) => [id, candidate.registration])) }));
     setFrameEvidence((previous) => ({ ...previous,
-      ...Object.fromEntries(entries.map(([id, candidate]) => [id, { source: 'auto-nid' as const,
+      ...Object.fromEntries(entries.map(([id, candidate]) => [id, { source: candidate.method==='da2' ? 'auto-depth' as const : 'auto-nid' as const,
         updatedAt: new Date().toISOString(), algorithmVersion: candidate.algorithmVersion, signal: candidate.signal,
         optimizationMetrics: { ...candidate.metrics } }])) }));
     const current = autoRegistrationCandidates[currentFrameId];
@@ -688,6 +704,7 @@ export default function App() {
     setSceneKey('');
     autoRegistrationAbort.current?.abort();
     setAutoRegistrationCandidates({});
+    setDepthResults({});
     setPreviewAutoRegistration(false);
     setActiveTaskId(next.id);
     setAnnotations(loadSaved(`atlas-labels-${next.id}`, []));
@@ -892,6 +909,7 @@ export default function App() {
     setPendingTiePoint(null);
     setRegistrationQuality('');
     setAutoRegistrationCandidates({});
+    setDepthResults({});
     setPreviewAutoRegistration(false);
     clearHistory();setTargetExtent('object');setDraftVertices([]);
     setAnnotations([]);
@@ -917,6 +935,7 @@ export default function App() {
       for (const frame of frames) if (imported.frames[frame.name]) next[frame.id] = imported.frames[frame.name].registration;
       setFrameRegistrations(next);
       setAutoRegistrationCandidates({});
+    setDepthResults({});
       setPreviewAutoRegistration(false);
       clearHistory();
       const changedFrameIds = new Set(frames.filter((frame) => imported.frames[frame.name]).map((frame) => frame.id));
@@ -993,7 +1012,7 @@ export default function App() {
           </>}
           {page !== 'registration' && <details className="model-drawer"><summary>AI 辅助标注</summary><PairModelBar models={modelProfiles} selectedModelId={selectedPairModel?.id ?? ""} onSelectModel={(id) => setSelectedModels((previous) => ({ ...previous, paired3d: id }))} onOpenSettings={() => navigate('models')} onRun={() => void runPairModel()} onCancel={() => pairAbort.current?.abort()} running={pairRunning} ready={Boolean(geometry)} candidates={pairCandidates} pointCandidateCount={pairPointCandidates.length} modelVersion={pairModelVersion} classes={classes} onFocus={(candidate) => { if (candidate.panorama?.kind === "point") setFocus({ uv: candidate.panorama.uv, serial: Date.now() }); else if (candidate.panorama?.kind === "polygon") setFocus({ uv: candidate.panorama.vertices[0], serial: Date.now() }); else if (candidate.pointCloud) setFocus({ uv: pointToPanorama(candidate.pointCloud.center, registration), serial: Date.now() }); }} onAccept={acceptPairCandidate} onReject={(id) => setPairCandidates((previous) => previous.filter((item) => item.id !== id))} onAcceptAll={acceptAllPairCandidates} onRejectAll={() => setPairCandidates([])} onAcceptPoints={acceptPairPoints} onRejectPoints={() => setPairPointCandidates([])} /></details>}
 {page !== 'registration' && (tool==='target-box' || tool==='pano-polygon' || currentVertices.length>0) && <ContourTools extent={targetExtent} onExtent={chooseExtent} target={tool==='target-box'} rectangle={targetRectangle} onRectangle={value=>{cancelDraft();setTargetRectangle(value);}} draft={draftVertices.length} vertices={currentVertices.length} selectedVertex={selectedVertex} canUndo={history.current.undoStack.length>0} canRedo={history.current.redoStack.length>0} onUndo={()=>undoEdit()} onRedo={()=>undoEdit(true)} onFinish={finishPolygon} onCancel={cancelDraft} onDeleteVertex={deleteVertex} onInsert={insertVertex} onRedraw={()=>deleteContour(true)} onDeleteContour={()=>deleteContour()}/>}
-                    {page==='registration' ? <RegistrationWorkflow sceneKey={sceneKey} sceneLoading={sceneLoading} coverageLabel={task.coverageLabel} onSceneChange={(key) => { if (dirty) save(); void loadLocalScene(key); }} step={registrationStep} onStep={chooseRegistrationStep} layout={viewLayout} onLayout={chooseLayout} linked={viewLinked && hasFramePose} onLinked={() => setViewLinked((value) => !value)} labeling={false} onLabel={() => { setPage('workspace'); setTool('navigate'); setSideOpen(true); chooseLayout('split'); }} hasPose={hasFramePose} parameters={<RegistrationInspector registration={registration} onChange={mutateRegistration} onReset={() => mutateRegistration(() => currentFrame.initialRegistration ?? initialRegistration, { source: initialPoseSource })} showProjection={showProjection} setShowProjection={setShowProjection} isDemo={isInsApproximate} />} frames={frames} frameIndex={frameIndex} tiePoints={tiePoints} pendingTiePoint={pendingTiePoint} pendingBoxCorner={null} selected={selected} quality={registrationQuality} evidence={frameEvidence[currentFrameId] ?? (task.isDemo ? { source: 'ins-approximate', updatedAt: '' } : undefined)} onFrameChange={changeFrame} onSolve={solveCurrentFrame} onAutoYaw={() => void runAutoYaw()} autoYawReady={hasUsableRgb(geometry)} autoYawRunning={autoYawRunning} automaticStatus={autoRegistrationStatus} automaticRunning={autoRegistrationRunning} automaticProgress={autoRegistrationProgress} automaticCandidate={autoRegistrationCandidates[currentFrameId]} automaticCandidateCount={Object.keys(autoRegistrationCandidates).length} automaticPreview={previewAutoRegistration} onAutomaticRun={(all) => void runAutoRegistration(all)} onAutomaticCancel={() => autoRegistrationAbort.current?.abort()} onAutomaticAccept={acceptAutoRegistration} onAutomaticReject={() => { setAutoRegistrationCandidates((previous) => { const next = { ...previous }; delete next[currentFrameId]; return next; }); setPreviewAutoRegistration(false); }} onAutomaticPreview={() => { setPreviewAutoRegistration((previous) => !previous); setShowProjection(true); }} onLocate={locateSelectedTarget} onImportPose={(file) => void importPoseAfterPair(file)} onRemoveTie={(id) => { setTiePoints((previous) => previous.filter((item) => item.id !== id)); setDirty(true); }} onClearTies={() => { setTiePoints((previous) => previous.filter((item) => item.frameId !== currentFrameId)); setDirty(true); }} onReview={() => { if (selected?.triangulation) updateAnnotation(selected.id, { triangulation: { ...selected.triangulation, reviewed: true } }); }} /> : <FrameNavigator frames={frames} index={frameIndex} onFrame={changeFrame} linked={viewLinked&&hasFramePose} hasPose={hasFramePose} onLinked={()=>setViewLinked(value=>!value)} selected={selected} pending={draftVertices.length>0} working={locatingTarget} onLocate={locateSelectedTarget} onReview={()=>{if(selected?.triangulation)updateAnnotation(selected.id,{triangulation:{...selected.triangulation,reviewed:true}});}}/>}
+                    {page==='registration' ? <RegistrationWorkflow sceneKey={sceneKey} sceneLoading={sceneLoading} coverageLabel={task.coverageLabel} onSceneChange={(key) => { if (dirty) save(); void loadLocalScene(key); }} step={registrationStep} onStep={chooseRegistrationStep} layout={viewLayout} onLayout={chooseLayout} linked={viewLinked && hasFramePose} onLinked={() => setViewLinked((value) => !value)} labeling={false} onLabel={() => { setPage('workspace'); setTool('navigate'); setSideOpen(true); chooseLayout('split'); }} hasPose={hasFramePose} parameters={<RegistrationInspector registration={registration} onChange={mutateRegistration} onReset={() => mutateRegistration(() => currentFrame.initialRegistration ?? initialRegistration, { source: initialPoseSource })} showProjection={showProjection} setShowProjection={setShowProjection} isDemo={isInsApproximate} />} frames={frames} frameIndex={frameIndex} tiePoints={tiePoints} pendingTiePoint={pendingTiePoint} pendingBoxCorner={null} selected={selected} quality={registrationQuality} evidence={frameEvidence[currentFrameId] ?? (task.isDemo ? { source: 'ins-approximate', updatedAt: '' } : undefined)} onFrameChange={changeFrame} onSolve={solveCurrentFrame} onAutoYaw={() => void runAutoYaw()} autoYawReady={hasUsableRgb(geometry)} autoYawRunning={autoYawRunning} automaticStatus={autoRegistrationStatus} automaticMethod={autoRegistrationMethod} onAutomaticMethod={(method) => { setAutoRegistrationMethod(method); setPreviewAutoRegistration(false); }} depthResult={depthResults[currentFrameId]} automaticRunning={autoRegistrationRunning} automaticProgress={autoRegistrationProgress} automaticCandidate={autoRegistrationCandidates[currentFrameId]} automaticCandidateCount={Object.keys(autoRegistrationCandidates).length} automaticPreview={previewAutoRegistration} onAutomaticRun={(all) => void runAutoRegistration(all)} onAutomaticCancel={() => autoRegistrationAbort.current?.abort()} onAutomaticAccept={acceptAutoRegistration} onAutomaticReject={() => { setAutoRegistrationCandidates((previous) => { const next = { ...previous }; delete next[currentFrameId]; return next; }); setPreviewAutoRegistration(false); }} onAutomaticPreview={() => { setPreviewAutoRegistration((previous) => !previous); setShowProjection(true); }} onLocate={locateSelectedTarget} onImportPose={(file) => void importPoseAfterPair(file)} onRemoveTie={(id) => { setTiePoints((previous) => previous.filter((item) => item.id !== id)); setDirty(true); }} onClearTies={() => { setTiePoints((previous) => previous.filter((item) => item.frameId !== currentFrameId)); setDirty(true); }} onReview={() => { if (selected?.triangulation) updateAnnotation(selected.id, { triangulation: { ...selected.triangulation, reviewed: true } }); }} /> : <FrameNavigator frames={frames} index={frameIndex} onFrame={changeFrame} linked={viewLinked&&hasFramePose} hasPose={hasFramePose} onLinked={()=>setViewLinked(value=>!value)} selected={selected} pending={draftVertices.length>0} working={locatingTarget} onLocate={locateSelectedTarget} onReview={()=>{if(selected?.triangulation)updateAnnotation(selected.id,{triangulation:{...selected.triangulation,reviewed:true}});}}/>}
           <div className={"split-view " + (viewLayout === "overlay" ? "is-overlay" : expandedCloud ? "is-expanded-cloud" : "")}><section className="viewport-card"><div className="viewport-head"><div className="viewport-heading"><span className="view-icon cloud"><Box size={18} /></span><div><strong>三维点云</strong><small>POINT CLOUD · PCD</small></div></div><div className="viewport-head-right"><span className="view-count">{geometry?.getAttribute('position')?.count.toLocaleString() ?? '—'} 点</span><button className="icon-button" aria-label={expandedCloud ? '还原双视图' : '放大点云窗口'} title={expandedCloud ? '还原双视图' : '放大点云窗口'} onClick={()=>setExpandedCloud(value=>!value)}><Maximize2 size={16}/></button></div></div><div className="viewport-body"><PointCloudView pointDisplayRanges={task.pointDisplayRanges} viewSync={viewSync} linked={viewLinked && hasFramePose} tiePoints={currentTies} pendingTiePoint={pendingTiePoint} geometry={geometry} annotations={annotations} previewAnnotations={pairCandidates} classes={classes} semanticLabels={semanticLabels} previewSemanticLabels={pairPreviewPointLabels} selectedId={selectedId} registration={displayedRegistration} tool={tool} focusSelected={focusSelected} onToggleFocus={() => setFocusSelected((value) => !value)} onCreate={onPointCloudPick} onUpdate={(id, box) => updateAnnotation(id, { pointCloud: box })} onPaint={paintPoints} onUndoPaint={undoPaint} canUndoPaint={paintHistory.length > 0} onSelect={onPointCloudSelect} onEmptySelection={() => flash("选区没有找到足够的点；请扩大范围或切换俯视视角")} onTiePointPick={addTiePoint} />{!geometry && <div className="viewer-loading">{loadError ? `加载失败：${loadError}` : '正在加载点云…'}</div>}{(sceneLoading || readyPanoramaUrl !== activePanoramaUrl) && <div className="frame-sync-mask" role="status">{panoramaError || '正在同步全景与点云视角…'}</div>}<div className="view-overlay top-left"><span className="live-dot" />{task.id === syntheticDemoTask.id ? '合成演示数据' : task.isDemo ? '真实样本 · 局部降采样' : '本地配对数据'}</div><div className="view-overlay bottom-left">{viewLinked && hasFramePose ? '拖动环视 · 滚轮同步缩放 · 当前相机位置' : '左键旋转 · 滚轮缩放 · 右键平移'}</div><div className="axis-legend"><i className="axis-x" />X <i className="axis-y" />Y <i className="axis-z" />Z</div></div><div className="viewport-foot"><span><span className="tiny-color cloud" />{task.pointCloudName}</span><span>{geometry ? '已加载' : '加载中'}</span></div></section>
           <div className="pair-bridge"><span><Link2 size={17} /></span></div>
           <section className="viewport-card"><div className="viewport-head"><div className="viewport-heading"><span className="view-icon pano"><Image size={18} /></span><div><strong>全景影像</strong><small>PANORAMA · 360°</small></div></div><div className="viewport-head-right"><span className="view-count">等距柱状投影</span><button className="icon-button" onClick={() => setFocus({ uv: [0.5, 0.5], serial: Date.now() })} title="回到正前方"><Focus size={16} /></button></div></div><div className="viewport-body"><PanoramaView canEdit={page==='workspace'} viewSync={viewSync} linked={viewLinked && hasFramePose} tiePoints={currentTies} onImageReady={(url, ready, error) => { setReadyPanoramaUrl((previous) => ready ? url : previous === url ? '' : previous); setPanoramaError(error ?? ''); }} imageUrl={activePanoramaUrl} cloudGeometry={geometry} annotations={displayAnnotations} previewAnnotations={pairCandidates} classes={classes} selectedId={selectedId} registration={displayedRegistration} tool={tool} draftVertices={draftVertices} selectedVertex={selectedVertex} onVertexSelect={setSelectedVertex} onVerticesChange={editVertices} onSelect={selectContourObject} showProjection={showProjection || viewLayout === "overlay"} focus={focus} onPick={onPanoramaPick} onFinishPolygon={finishPolygon} />{(sceneLoading || readyPanoramaUrl !== activePanoramaUrl) && <div className="frame-sync-mask" role="status">{panoramaError || '正在同步全景与点云视角…'}</div>}<div className="view-overlay top-left"><span className="live-dot cyan" />{showProjection ? '点云投影叠加 · 核验中' : '球面交互视图'}</div><div className="view-overlay bottom-left">拖拽环视 · 滚轮调整视角</div><div className="compass">N <span>·</span> 360°</div></div><div className="viewport-foot"><span><span className="tiny-color pano" />{activePanoramaName}</span><span>{readyPanoramaUrl === activePanoramaUrl ? '已配对' : '同步中'}</span></div></section></div>

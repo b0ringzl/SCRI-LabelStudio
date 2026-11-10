@@ -14,6 +14,7 @@ __pycache__/
 .venv-extrinsics/
 .venv-scene-import/
 .venv-registration/
+.venv-da2/
 /output/pdf/
 /tmp/pdfs/
 
