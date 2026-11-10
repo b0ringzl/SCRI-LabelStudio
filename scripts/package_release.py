@@ -45,6 +45,12 @@ def package(platform: str, launcher: str, readme: str) -> Path:
         add_file(archive, ROOT / "scripts" / "llmGateway.mjs", f"{folder}/scripts/llmGateway.mjs")
         for name in ("registrationGateway.mjs", "registration_worker.py", "setup_registration.py", "requirements-registration.txt"):
             add_file(archive, ROOT / "scripts" / name, f"{folder}/scripts/{name}")
+        for name in ("depthGateway.mjs", "depth_worker.py", "depth_geometry.py", "setup_depth.py", "requirements-depth.txt", "da2-release.json"):
+            add_file(archive, ROOT / "scripts" / name, f"{folder}/scripts/{name}")
+        depth_setup = "Setup-Depth-Windows.bat" if platform == "Windows" else "Setup-Depth-macOS.command"
+        add_file(archive, ROOT / depth_setup, f"{folder}/{depth_setup}", executable=platform == "macOS")
+        for name in ("DEPTH_REGISTRATION.md", "CHANGELOG_0.16.0.md"):
+            add_file(archive, ROOT / "docs" / name, f"{folder}/docs/{name}")
         setup = "Setup-Registration-Windows.bat" if platform == "Windows" else "Setup-Registration-macOS.command"
         add_file(archive, ROOT / setup, f"{folder}/{setup}", executable=platform == "macOS")
         for name in ("AUTOMATIC_REGISTRATION.md", "CHANGELOG_0.15.0.md"):

@@ -28,6 +28,7 @@ from manual_illustrations import FIGURES, ManualFigure, load_figures, publish_sv
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT/'docs'/'REGISTRATION_MANUAL.md'
 REVISION = '2026-11-10'
+VERSION = json.loads((ROOT/'package.json').read_text(encoding='utf-8'))['version']
 INK, MUTED, PURPLE = colors.HexColor('#16243b'), colors.HexColor('#64748b'), colors.HexColor('#7565db')
 PALE, BORDER = colors.HexColor('#f3f1fc'), colors.HexColor('#dfe5ef')
 WIDTH = A4[0]-88
@@ -125,14 +126,14 @@ def build(platform, output, fonts):
     }
     doc = Manual(str(output), pagesize=A4, leftMargin=44, rightMargin=44, topMargin=53, bottomMargin=46,
                  title=f'点云与全景影像配准模块操作手册 - {platform}', author='SCRI Labeling',
-                 subject=f'0.15.0 / manual revision {REVISION}', pageCompression=1)
+                 subject=f'{VERSION} / manual revision {REVISION}', pageCompression=1)
     def decorate(canvas, _doc):
         canvas.setFillColor(MUTED)
         canvas.setFont(body, 8)
         canvas.drawString(44, A4[1]-30, f'SCRI Labeling  |  配准模块操作手册  |  {platform}')
         canvas.setStrokeColor(BORDER)
         canvas.line(44, A4[1]-36, A4[0]-44, A4[1]-36)
-        canvas.drawString(44, 26, f'适用软件 0.15.0   /   修订 {REVISION}')
+        canvas.drawString(44, 26, f'适用软件 {VERSION}   /   修订 {REVISION}')
         canvas.drawRightString(A4[0]-44, 26, str(_doc.page))
     frame = Frame(44, 46, WIDTH, A4[1]-99, leftPadding=0, rightPadding=0, topPadding=0, bottomPadding=0)
     doc.addPageTemplates(PageTemplate(id='manual', frames=[frame], onPage=decorate))
@@ -141,10 +142,10 @@ def build(platform, output, fonts):
         Spacer(1, 22), Paragraph('点云与全景影像<br/>配准模块操作手册', ParagraphStyle('cover',fontName=strong,fontSize=29,leading=41,textColor=INK)),
         Spacer(1, 18), p(f'{platform} 版', 'h1'), p('从数据准备、粗配准到同名点精调、投影核验和成果交接。'),
         Spacer(1, 12), workflow(body), Spacer(1, 18),
-        p('适用版本：0.15.0  |  手册第 3 版 · 操作图解版'), p(f'修订日期：{REVISION}'),
+        p(f'适用版本：{VERSION}  |  手册第 4 版 · 操作图解与 DA2 接入'), p(f'修订日期：{REVISION}'),
         p('面向：标注员 / 数据准备人员 / 算法与平台开发同事'),
         Spacer(1, 25), p('先用源位姿与同名点跑通流程，再增加自动候选。拟合残差、观察同步和自动候选通过均不等于独立精度验收。', 'small'),
-        p('依据 0.15.0 当前源码核对；界面截图使用合成建筑教学样本，操作编号为后期矢量引导。无真实测区影像或设备参数。', 'small'), PageBreak()]
+        p('依据当前源码核对；第 16 章新增 DA2 操作。原有界面图解保留 0.15.0 合成教学样本，操作编号为后期矢量引导。无真实测区影像或设备参数。', 'small'), PageBreak()]
     story += [p('本平台快速开始', 'h1')]
     if platform=='Windows':
         story += [p('1. 安装 Node.js 20+，完整解压平台包。'), p('2. 双击 Start-Atlas-Windows.bat；或在 PowerShell 中运行：'),
@@ -236,7 +237,7 @@ def main():
     publish_svgs()
     output=ROOT/'output'/'pdf';published=ROOT/'docs'/'manuals'
     output.mkdir(parents=True,exist_ok=True);published.mkdir(parents=True,exist_ok=True)
-    manifest={'revision':REVISION,'softwareVersion':'0.15.0','sourceSha256':sha(SOURCE),
+    manifest={'revision':REVISION,'softwareVersion':VERSION,'sourceSha256':sha(SOURCE),
               'builderSha256':sha(Path(__file__)),'illustratorSha256':sha(ROOT/'scripts'/'manual_illustrations.py'),
               'figureCount':len(load_figures()),'figureAssets':[
                   {'file':path.relative_to(published).as_posix(),'sha256':sha(path)}

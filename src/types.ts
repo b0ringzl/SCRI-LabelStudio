@@ -31,7 +31,7 @@ export interface TiePoint {
 }
 
 export interface RegistrationEvidence {
-  source: 'ins-approximate' | 'imported' | 'manual' | 'tie-points' | 'color-yaw' | 'auto-nid';
+  source: 'ins-approximate' | 'imported' | 'manual' | 'tie-points' | 'color-yaw' | 'auto-nid' | 'auto-depth';
   updatedAt: string;
   medianErrorDeg?: number;
   maxErrorDeg?: number;

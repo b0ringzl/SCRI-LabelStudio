@@ -47,3 +47,7 @@
 ## 0.15.0 自动精配准
 
 先运行 `sh ./Setup-Registration-macOS.command`，再正常启动。只安装本项目独立 Python CPU 环境，无需模型权重。导入粗位姿后，在“配准 → 粗配准 → 自动精配准”生成候选，再比较原位姿、应用或舍弃。详见 docs/AUTOMATIC_REGISTRATION.md。
+
+## 0.16.0 DA² 深度辅助配准
+
+Apple Silicon 运行 `sh ./Setup-Depth-macOS.command` 安装项目独立环境和公开权重。进入“配准 → 粗配准”，选择 DA²，先看深度再核验候选。优先使用 MPS，必要时设置 `ATLAS_DEPTH_DEVICE=cpu`；本版尚未进行 Mac 实机模型验证。Intel Mac 可继续使用界面与 NID。完整操作与接口见 [DA² 配准手册](docs/DEPTH_REGISTRATION.md)。

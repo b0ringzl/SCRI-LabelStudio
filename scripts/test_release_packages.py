@@ -33,9 +33,12 @@ def main():
                 if platform == 'macOS':
                     assert stat.S_IMODE(archive.getinfo(folder+'/Import-Scene-macOS.command').external_attr >> 16) == 0o755
                     assert stat.S_IMODE(archive.getinfo(folder+'/Setup-Registration-macOS.command').external_attr >> 16) == 0o755
+                    assert stat.S_IMODE(archive.getinfo(folder+'/Setup-Depth-macOS.command').external_attr >> 16) == 0o755
                 for worker in ('registration_worker.py','registrationGateway.mjs','setup_registration.py','requirements-registration.txt'):
                     assert archive.read(folder+'/scripts/'+worker) == (ROOT/'scripts'/worker).read_bytes()
-                assert not any('/.venv-registration/' in item.filename for item in archive.infolist())
+                for worker in ('depthGateway.mjs','depth_worker.py','depth_geometry.py','setup_depth.py','requirements-depth.txt','da2-release.json'):
+                    assert archive.read(folder+'/scripts/'+worker) == (ROOT/'scripts'/worker).read_bytes()
+                assert not any('/.venv-' in item.filename or '/local-models/' in item.filename or '/local-samples/' in item.filename for item in archive.infolist())
                 assert archive.read(folder+'/dist/index.html') == (ROOT/'dist'/'index.html').read_bytes()
                 for edition in ('Windows', 'macOS'):
                     assert archive.read(folder+f'/docs/manuals/Registration-Manual-{edition}.pdf').startswith(b'%PDF-')
@@ -58,6 +61,9 @@ def main():
                 if not match: raise RuntimeError('Packaged server failed: '+line+process.stdout.read())
                 url = match.group(0)
                 with opener.open(url, timeout=10) as response: assert response.status == 200
+                with opener.open(url+'api/registration/depth', timeout=10) as response:
+                    depth = json.load(response)
+                assert depth['configured'] is False and depth['weightsRequired'] is True
                 with opener.open(url+'api/local-scene/manifest?scene=beta', timeout=10) as response:
                     manifest = json.load(response)
                 assert manifest['sceneKey'] == 'beta' and len(manifest['scenes']) == 2

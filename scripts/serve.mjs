@@ -6,6 +6,7 @@ import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { handleLlmPredict } from './llmGateway.mjs';
 import { handleRegistration } from './registrationGateway.mjs';
+import { handleDepth } from './depthGateway.mjs';
 import { createSceneGateway } from './sceneCatalogGateway.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..', 'dist');
@@ -131,6 +132,10 @@ async function serveFile(request, response) {
   }
   if (pathname === '/api/registration/automatic') {
     await handleRegistration(request, response);
+    return;
+  }
+  if (pathname === '/api/registration/depth') {
+    await handleDepth(request, response);
     return;
   }
   if (request.method !== 'GET' && request.method !== 'HEAD') {

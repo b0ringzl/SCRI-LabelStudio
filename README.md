@@ -1,10 +1,12 @@
 # SCRI Labeling · 点云与全景联合标注原型
 
-> 公开成果镜像 · v0.15.0。包含可运行源码、Windows/macOS 启动与打包脚本、模型/配准/蒸馏接口和合成图解手册。真实测区数据、含实测影像的视频、模型密钥及本机环境不在公开版中。公开贡献请向本仓库 `main` 提交 PR，维护者再与团队主线同步。详见 [公开版同步说明](docs/PUBLIC_SYNC_0.15.0.md)。
+> 公开成果镜像 · v0.16.0。包含可运行源码、双平台启动/打包脚本、DA²/NID 配准及模型/蒸馏接口。真实调查数据、含实测影像的视频、模型大权重、密钥及本机环境不在公开版中。公开贡献请向本仓库 main 提交 PR。详见 [公开版同步说明](docs/PUBLIC_SYNC_0.16.0.md)。
 
-配准模块独立手册（2026-11-10 第 3 版，适用 0.15.0）：[Windows PDF](docs/manuals/Registration-Manual-Windows.pdf) · [macOS PDF](docs/manuals/Registration-Manual-macOS.pdf) · [完整 Markdown 原稿](docs/REGISTRATION_MANUAL.md)。两版各 30 页，10 张带编号箭头的操作图解覆盖导入、粗配准、同步切帧、同名点选取/纠错/求解、投影核验、无权重自动候选与保存恢复；截图使用可共享的合成建筑教学样本，附位姿提取工具和格式示例。
+配准模块独立手册（2026-11-10 第 4 版，适用 0.16.0）：[Windows PDF](docs/manuals/Registration-Manual-Windows.pdf) · [macOS PDF](docs/manuals/Registration-Manual-macOS.pdf) · [完整 Markdown 原稿](docs/REGISTRATION_MANUAL.md)。两版各 31 页，保留 10 张合成教学操作图解，第 16 章新增 DA² 安装、深度查看、位姿候选核验和指标解释，附位姿提取工具与格式示例。
 
-一个参考 Label Studio 工作流的点云与全景多源标注工具。支持数据导入、逐帧位姿与同名点配准、双向视角同步、多帧目标定位、人工标注与纠错、千问／DeepSeek 模型接口及蒸馏数据接口。0.15.0 增加无需模型权重的本机六自由度 NID 自动精配准。
+一个参考 Label Studio 工作流的点云与全景多源标注工具。支持数据导入、逐帧位姿与同名点配准、双向视角同步、多帧目标定位、人工标注与纠错、千问／DeepSeek 模型接口及蒸馏数据接口。0.16.0 新增 DA² 单全景深度辅助配准，可与原有无需权重的 NID 方法切换。
+
+DA² 安装：Windows 运行 `Setup-Depth-Windows.bat`；Apple Silicon macOS 执行 `sh ./Setup-Depth-macOS.command`。使用项目独立 `.venv-da2` 和公开官方权重；运行平台后在“配准 → 粗配准”选择 DA²，生成深度并预览位姿候选。需要粗位姿，单目深度不是米制真值；不通过检查时保留原位姿。[安装、模型接口与 UI 用法](docs/DEPTH_REGISTRATION.md) · [0.16.0 详细变更](docs/CHANGELOG_0.16.0.md)。
 
 自动精配准安装：Windows 运行 `Setup-Registration-Windows.bat`；macOS 运行 `sh ./Setup-Registration-macOS.command`。两者创建项目独立环境 `.venv-registration`，再用原 Start-Atlas 启动器打开平台。需要 Python 3.10+，CPU 即可运行。先导入粗位姿，再在“配准 → 粗配准 → 自动精配准”生成候选，预览后选择应用或舍弃。
 
@@ -80,7 +82,7 @@ ZIP 已包含构建结果与示例数据。启动脚本会在本机开启网页�
 
 ## GitHub 协作
 
-团队开发主线另行维护，本仓库用于公开成果同步与交流。公开贡献在功能分支提交 PR 到本仓库 `main`，由维护者审核并同步。现有功能、代码入口、能力边界和两平台验证见 [功能与协作交接](docs/FEATURE_HANDOFF.md)。
+团队开发主线另行维护，本仓库用于公开成果同步与交流。公开贡献在功能分支提交 PR 到本仓库 main，由维护者审核并同步。现有功能、代码入口、能力边界和两平台验证见 [功能与协作交接](docs/FEATURE_HANDOFF.md)。
 
 本轮道路设施复核、模型切换和千问／DeepSeek 接入的逐提交说明见 [2026-10-09 合并说明](docs/MERGE_NOTES_2026-10-09.md)。
 
@@ -88,7 +90,7 @@ ZIP 已包含构建结果与示例数据。启动脚本会在本机开启网页�
 
 ### 演示与数据
 
-公开版提供合成建筑点云、全景及 10 张操作图解。包含真实测区影像的视频与工程不随公开版发布；无需这些素材即可构建、运行或阅读手册。
+公开版提供合成建筑点云、全景及 10 张操作图解。包含真实测区影像的视频与工程不随公开版发布；无需这些素材即可构建、运行或阅读手册。DA² 的真实图像深度与投影对比保留在本机，公开变更说明只提供去掉资产的指标及能力边界。
 
 ## 已实现的工作流
 

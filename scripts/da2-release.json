@@ -1,0 +1,10 @@
+{
+  "repository": "https://github.com/EnVision-Research/DA-2.git",
+  "sourceRevision": "d659838585f2bc9967c7e9367af573795271dbbb",
+  "modelRepository": "haodongli/DA-2",
+  "modelRevision": "0d55ccb5e46b8ed4715fae3a4c04fc897f1689f3",
+  "filename": "model.safetensors",
+  "bytes": 1378513064,
+  "sha256": "d8ea568fc3dfb7d7432e5b763de499dd03fb6dc1c2020d84639f35e2dfa4f78e",
+  "license": "Apache-2.0"
+}
