@@ -14,6 +14,7 @@
 | 配准核验 | 导入相机→点云矩阵或逐帧 INS×相机硬件外参；彩色点云可估 yaw 候选；四对以上同名点求每帧六自由度位姿；投影叠加供核验。 | `src/registrationIO.ts`、`src/registrationMath.ts`、`src/autoYaw.ts`、[工作流](REGISTRATION_WORKFLOW.md) |
 | NID 自动精配准 | 无权重 CPU 球面 NID 六自由度局部优化；当前/全部帧、取消、候选预览、原位姿对比、应用/舍弃。需已有粗位姿和有效强度/真实 RGB，候选仍须独立核验。 | `src/automaticRegistration.ts`、`scripts/registrationGateway.mjs`、`scripts/registration_worker.py`、[部署与 API](AUTOMATIC_REGISTRATION.md) |
 | DA² 深度辅助配准（0.16.0） | 单张全景生成相对深度，结合实际 XYZ 点云与粗位姿求局部尺度/外参候选；支持深度查看、与 NID 切换和人工确认。拒绝结果保留原位姿。 | `src/depthRegistration.ts`、`scripts/depth_worker.py`、`scripts/depth_geometry.py`、[模型与 UI 接入手册](DEPTH_REGISTRATION.md) |
+| DA² 配对测试套件 | 四组真实场景、32 帧的本地制作工具；双平台启动器、逐文件校验清单与五帧参考计划。GitHub 仅提交工具与指南，测绘数据包本地生成。 | `scripts/package_depth_test_suite.py`、`examples/registration/depth-test-plan.json`、[测试步骤与文件说明](DEPTH_TEST_SCENES.md) |
 | 连续全景定位 | 在相邻帧以同一对象 ID 框定目标，按逐帧位姿三角交会；检查基线、视差、射线偏差与点云距离，再生成待人工核验的 3D 候选框。 | `src/RegistrationWorkflow.tsx`、`src/App.tsx`、[工作流](REGISTRATION_WORKFLOW.md) |
 | 道路设施图片复核 | 导入 `data_for_annotation` 的 JPG/YOLO TXT；按七类规则增删、移动、缩放 2D 框，改类别，提示疑似重复；逐张确认，保存本机进度，导入/导出 YOLO ZIP。 | `src/ImageReview.tsx`、`src/reviewData.ts`、[批次说明](ROAD_FURNITURE_REVIEW.md) |
 | 可切换模型接口 | 保存多个图片或配对任务的 HTTP 模型配置；上传资产、运行预测、校验结果；候选由人工接受后才成为正式标注。附 mock 服务供联调。 | `src/modelRegistry.ts`、`src/modelApi.ts`、`src/prelabel.ts`、`examples/mock-model-server.mjs`、[接口契约](MODEL_API.md) |
@@ -23,7 +24,7 @@
 
 ## 数据与能力边界
 
-- 仓库只包含合成演示点云与全景。`label/data` 的真实图片、标签、PPTX、尖沙咀原始数据、本机配置、密钥、`node_modules`、`dist` 和 `release` 均不提交。交付 ZIP 也不包含真实数据。
+- 仓库只包含合成演示点云与全景。`label/data` 的真实图片、标签、PPTX、尖沙咀原始数据、本机配置、密钥、`node_modules`、`dist` 和 `release` 均不提交。常规应用 ZIP 不包含真实数据；另行在本地制作的配对测试套件含用户数据，仅用于本地或获准的私有共享。
 - 尖沙咀样本仍是 INS 粗配准，没有独立标定的 LiDAR 到相机外参。颜色朝向只估 yaw；NID 与 DA² 后端可在粗位姿附近求六自由度候选，均不代表无初值全局配准。低内部残差不等于测量真值。多帧定位仍需核验目标身份与点云框；大规模空间索引和可靠的全自动外参标定仍需后续工作。
 - 千问和 DeepSeek 接口仅从影像生成 2D 区域候选；不会直接生成可信的点云 3D 框或逐点标签。真实推理须由使用者配置有效服务与 Key，仓库不含模型权重。
 - 蒸馏版本只交付已审核标签清单和外部训练服务契约；影像上传页面、训练后端、效果评估执行和自动部署尚未实现。训练效果需要独立人工真值集验证。

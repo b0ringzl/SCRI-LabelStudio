@@ -29,6 +29,7 @@ jobs:
       - run: python -m pip install -r scripts/requirements-registration.txt
       - run: python scripts/test_registration_worker.py
       - run: python scripts/test_depth_geometry.py
+      - run: python scripts/test_depth_test_suite.py
       - run: python -m py_compile scripts/import_and_open.py scripts/complete_scene_coverage.py scripts/package_generalization_suite.py
       - run: python -m py_compile scripts/validate_vendor_color_control.py
       - run: python -m py_compile scripts/prepare_trial_scene.py scripts/package_scene_trial.py
