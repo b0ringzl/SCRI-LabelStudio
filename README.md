@@ -1,6 +1,8 @@
 # SCRI Labeling · 点云与全景联合标注原型
 
-> 公开成果镜像 · v0.16.0。包含可运行源码、双平台启动/打包脚本、DA²/NID 配准及模型/蒸馏接口。真实调查数据、含实测影像的视频、模型大权重、密钥及本机环境不在公开版中。公开贡献请向本仓库 main 提交 PR。详见 [公开版同步说明](docs/PUBLIC_SYNC_0.16.0.md)。
+0.17.0 新增路面标识工具。在强度俯视点云上框选菱形、箭头、斑马线、停止线和车道线段，可移动、改宽长、旋转并导出。详见 [操作与数据格式](docs/ROAD_MARKING.md)。
+
+> 公开成果镜像 · v0.17.0。包含可运行源码、双平台启动/打包脚本、DA²/NID 配准及模型/蒸馏接口。真实调查数据、含实测影像的视频、模型大权重、密钥及本机环境不在公开版中。公开贡献请向本仓库 main 提交 PR。详见 [公开版同步说明](docs/PUBLIC_SYNC_0.16.0.md)。
 
 配准模块独立手册（2026-11-10 第 4 版，适用 0.16.0）：[Windows PDF](docs/manuals/Registration-Manual-Windows.pdf) · [macOS PDF](docs/manuals/Registration-Manual-macOS.pdf) · [完整 Markdown 原稿](docs/REGISTRATION_MANUAL.md)。两版各 31 页，保留 10 张合成教学操作图解，第 16 章新增 DA² 安装、深度查看、位姿候选核验和指标解释，附位姿提取工具与格式示例。
 

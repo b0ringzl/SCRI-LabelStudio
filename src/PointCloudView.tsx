@@ -563,7 +563,17 @@ export default function PointCloudView({ geometry, annotations, previewAnnotatio
     if (!view) return;
     disposeOverlays(view.overlays);
     for (const annotation of [...annotations, ...previewAnnotations]) {
-      if (!annotation.visible || !annotation.pointCloud) continue;
+      if (!annotation.visible) continue;
+      if (annotation.roadMarking) {
+        const corners = annotation.roadMarking.corners;
+        const points = corners.flatMap((corner,index) => [corner,corners[(index+1)%4]])
+          .map(([x,y,z])=>new THREE.Vector3(x,y+.045,z));
+        const wire = new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(points),
+          new THREE.LineBasicMaterial({color:annotation.id===selectedId?'#ffd479':'#5ce3cb',depthTest:false}));
+        wire.renderOrder = 3;
+        view.overlays.add(wire);
+      }
+      if (!annotation.pointCloud) continue;
       const preview = previewAnnotations.includes(annotation);
       const definition = classes.find((item) => item.id === annotation.classId);
       const color = new THREE.Color(preview ? '#c3a4ff' : definition?.color ?? '#ffffff');

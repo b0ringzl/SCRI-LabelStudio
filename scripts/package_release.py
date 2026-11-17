@@ -70,6 +70,7 @@ def package(platform: str, launcher: str, readme: str) -> Path:
         add_file(archive, ROOT / import_launcher, f"{folder}/{import_launcher}", executable=platform == "macOS")
         add_file(archive, ROOT / "docs" / readme, f"{folder}/README.md")
         add_file(archive, ROOT / "docs" / "ROAD_FURNITURE_REVIEW.md", f"{folder}/docs/ROAD_FURNITURE_REVIEW.md")
+        add_file(archive, ROOT / "docs" / "ROAD_MARKING.md", f"{folder}/docs/ROAD_MARKING.md")
         add_file(archive, ROOT / "docs" / "MODEL_API.md", f"{folder}/docs/MODEL_API.md")
         add_file(archive, ROOT / "docs" / "MODEL_SWITCHING.md", f"{folder}/docs/MODEL_SWITCHING.md")
         add_file(archive, ROOT / "docs" / "MERGE_NOTES_2026-10-09.md", f"{folder}/docs/MERGE_NOTES_2026-10-09.md")
