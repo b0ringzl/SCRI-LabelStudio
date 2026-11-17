@@ -1,6 +1,6 @@
 export type Vec3 = [number, number, number];
 export type UV = [number, number];
-export type ToolMode = 'navigate' | 'cuboid' | 'cloud-paint' | 'pano-point' | 'pano-polygon' | 'tie-point' | 'target-box';
+export type ToolMode = 'navigate' | 'cuboid' | 'cloud-paint' | 'road-marking' | 'pano-point' | 'pano-polygon' | 'tie-point' | 'target-box';
 export type Page = 'review' | 'workspace' | 'tasks' | 'sources' | 'ontology' | 'registration' | 'models' | 'training';
 
 export interface ClassDefinition {
@@ -57,6 +57,17 @@ export interface Cuboid {
   yaw?: number; // degrees around +Y; optional for older saved annotations
 }
 
+export type RoadMarkingType = 'diamond' | 'arrow' | 'crosswalk' | 'stop-line' | 'dashed-line' | 'solid-line' | 'text-symbol' | 'other';
+
+export interface RoadMarkingBox {
+  kind: 'road-marking-box';
+  type: RoadMarkingType;
+  center: Vec3;
+  size: [width: number, length: number];
+  yaw: number; // clockwise from local -Z, in degrees
+  corners: [Vec3, Vec3, Vec3, Vec3]; // XZ perimeter sampled at local ground heights
+}
+
 export interface Annotation {
   id: string;
   classId: string;
@@ -67,6 +78,7 @@ export interface Annotation {
   modelId?: string;
   modelVersion?: string;
   pointCloud?: Cuboid;
+  roadMarking?: RoadMarkingBox;
   panoramaFrameId?: string;
   observations?: TargetObservation[];
   triangulation?: { baselineM: number; maxRayAngleDeg: number; medianRayMissM: number; nearestCloudPointM: number; reviewed: boolean; stale?: boolean; method?: 'silhouette'; supportPointCount?: number; extent?: 'surface' | 'object' };

@@ -1,0 +1,21 @@
+.road-marking-view { position:absolute; inset:0; background:#131a23; overflow:hidden; }
+.road-marking-view canvas, .road-marking-drawing { position:absolute; inset:0; width:100%; height:100%; }
+.road-marking-drawing { cursor:crosshair; touch-action:none; }
+.road-box polygon, .road-box-draft { fill:#3bd9be24; stroke:#5ce3cb; stroke-width:1.8; cursor:move; }
+.road-box.selected polygon, .road-box-draft { fill:#f8cb612c; stroke:#ffd479; stroke-width:2; }
+.road-box-draft { stroke-dasharray:4 3; pointer-events:none; }
+.road-box line { stroke:#ffd479; pointer-events:none; }
+.road-box circle, .road-box rect { fill:#ffd479; stroke:#1a2430; stroke-width:1.6; }
+.road-box circle { cursor:grab; }
+.road-box circle:active { cursor:grabbing; }
+.road-box rect { cursor:crosshair; }
+.road-box text { fill:#eff8f6; stroke:#141d28; stroke-width:3; paint-order:stroke fill; font-size:11px; pointer-events:none; }
+.road-camera { fill:#7ce5fa; stroke:#162739; stroke-width:1.5; pointer-events:none; }
+.road-marking-controls { position:absolute; top:9px; left:9px; right:9px; display:flex; flex-wrap:wrap; gap:5px; align-items:center; pointer-events:none; }
+.road-marking-controls button, .road-marking-controls select { pointer-events:auto; display:inline-flex; align-items:center; justify-content:center; min-height:31px; padding:0 8px; border:1px solid #526273; border-radius:6px; color:#f1f5f9; background:#253449; font:inherit; font-size:12px; }
+.road-marking-controls button:hover:enabled { background:#394d63; }
+.road-marking-controls button:disabled { opacity:.5; }
+.road-marking-meta { position:absolute; inset:auto 9px 9px; display:flex; gap:6px; align-items:flex-end; justify-content:space-between; flex-wrap:wrap; pointer-events:none; font-size:11px; color:#edf5fb; }
+.road-marking-meta span { display:inline-flex; align-items:center; gap:5px; padding:4px 6px; border-radius:4px; background:#192637ed; }
+.road-marking-meta .road-scale { justify-content:center; border-bottom:2px solid currentColor; border-radius:0; white-space:nowrap; box-sizing:border-box; }
+.road-marking-message { position:absolute; bottom:39px; left:9px; right:9px; color:#ffe3a4; background:#2a3141; padding:8px; border-radius:5px; font-size:12px; pointer-events:none; }
